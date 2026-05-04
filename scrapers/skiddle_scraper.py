@@ -28,8 +28,6 @@ EVENT_TYPES = [
     ('CLUB', 'music'),       # Club nights
     ('COMEDY', 'comedy'),    # Comedy
     ('THEATRE', 'theatre'),  # Theatre / performing arts
-    ('EXHIBITION', 'art'),   # Art exhibitions
-    ('RAVE', 'music'),       # Raves / electronic
 ]
 
 
