@@ -18,17 +18,18 @@ def main():
     print('  Cultured London — Event Data Pipeline')
     print('=' * 55)
 
-    # 1. Always run seed data (curated events)
-    print('\n[1/5] Loading curated seed events...')
-    try:
-        from seed_data import run as seed_run
-        seed_run()
-    except Exception as e:
-        print(f'  Seed error: {e}')
-
+    # 1. Seed data (only when --seed-only flag is given; skipped in production)
     if seed_only:
+        print('\n[1/5] Loading curated seed events...')
+        try:
+            from seed_data import run as seed_run
+            seed_run()
+        except Exception as e:
+            print(f'  Seed error: {e}')
         print('\n--seed-only flag set. Done.')
         return
+    else:
+        print('\n[1/5] Seed events skipped (real scrapers active)')
 
     # 2. Ticketmaster (concerts, shows, major events — free API key)
     print('\n[2/5] Ticketmaster Discovery API...')
