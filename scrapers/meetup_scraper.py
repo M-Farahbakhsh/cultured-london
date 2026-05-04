@@ -11,7 +11,7 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env.loca
 
 sb = create_client(
     os.environ['NEXT_PUBLIC_SUPABASE_URL'],
-    os.environ['NEXT_PUBLIC_SUPABASE_ANON_KEY'],
+    os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or os.environ['NEXT_PUBLIC_SUPABASE_ANON_KEY'],
 )
 
 GQL = 'https://api.meetup.com/gql'

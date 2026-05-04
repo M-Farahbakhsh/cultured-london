@@ -33,3 +33,4 @@ __pycache__/
 scrapers/.env
 venv/
 .venv/
+.vercel

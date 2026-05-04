@@ -10,10 +10,10 @@ from supabase import create_client
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env.local'))
 
 url = os.environ.get('NEXT_PUBLIC_SUPABASE_URL')
-key = os.environ.get('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or os.environ.get('NEXT_PUBLIC_SUPABASE_ANON_KEY')
 
 if not url or not key:
-    sys.exit('ERROR: Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local')
+    sys.exit('ERROR: Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local')
 
 sb = create_client(url, key)
 
