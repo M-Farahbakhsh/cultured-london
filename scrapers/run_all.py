@@ -1,9 +1,10 @@
 """
 Master scraper runner. Run this to populate the events database.
-Usage: python scrapers/run_all.py [--seed-only]
+Usage: python scrapers/run_all.py [--seed-only] [--no-browser]
 
 Options:
-  --seed-only    Only insert the 30 curated seed events (fastest, good for dev)
+  --seed-only    Only insert the curated seed events (fastest, good for dev)
+  --no-browser   Skip the venue scraper (which needs Playwright/Chromium)
   (no flag)      Run all scrapers: seed + Eventbrite + Meetup + venues
 """
 import sys, os
@@ -11,6 +12,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 def main():
     seed_only = '--seed-only' in sys.argv
+    no_browser = '--no-browser' in sys.argv
 
     print('=' * 55)
     print('  Cultured London — Event Data Pipeline')
@@ -44,13 +46,16 @@ def main():
     except Exception as e:
         print(f'  Meetup error: {e}')
 
-    # 4. Venue websites
-    print('\n[4/4] London venue websites...')
-    try:
-        from london_venues_scraper import run as venue_run
-        venue_run()
-    except Exception as e:
-        print(f'  Venue scraper error: {e}')
+    # 4. Venue websites (requires Playwright/Chromium)
+    if no_browser:
+        print('\n[4/4] Venue websites skipped (--no-browser)')
+    else:
+        print('\n[4/4] London venue websites...')
+        try:
+            from london_venues_scraper import run as venue_run
+            venue_run()
+        except Exception as e:
+            print(f'  Venue scraper error: {e}')
 
     print('\n' + '=' * 55)
     print('  Pipeline complete.')
