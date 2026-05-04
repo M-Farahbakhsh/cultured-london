@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link'
-import Image from 'next/image'
+
 import { Bookmark, BookmarkCheck, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import type { Event, Category } from '@/lib/types'
@@ -43,11 +43,10 @@ export default function EventCard({ event, initialSaved = false }: Props) {
       {/* Image / gradient header */}
       <div className="relative h-40 overflow-hidden">
         {event.image_url ? (
-          <Image
+          <img
             src={event.image_url}
             alt={event.title}
-            fill
-            className="object-cover group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
           <div className={`w-full h-full bg-gradient-to-br ${gradient} opacity-90`} />
