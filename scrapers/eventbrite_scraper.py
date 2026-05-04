@@ -27,6 +27,8 @@ HEADERS = {
     'Accept-Language': 'en-GB,en;q=0.9',
 }
 
+MAX_PAGES = 3  # pages to scrape per category
+
 CATEGORY_PAGES = [
     ('music',   'https://www.eventbrite.co.uk/d/united-kingdom--london/music/'),
     ('art',     'https://www.eventbrite.co.uk/d/united-kingdom--london/visual-arts/'),
@@ -35,6 +37,9 @@ CATEGORY_PAGES = [
     ('film',    'https://www.eventbrite.co.uk/d/united-kingdom--london/film-media/'),
     ('talk',    'https://www.eventbrite.co.uk/d/united-kingdom--london/community/'),
     ('theatre', 'https://www.eventbrite.co.uk/d/united-kingdom--london/performing-arts/'),
+    ('other',   'https://www.eventbrite.co.uk/d/united-kingdom--london/food-and-drink/'),
+    ('talk',    'https://www.eventbrite.co.uk/d/united-kingdom--london/business/'),
+    ('other',   'https://www.eventbrite.co.uk/d/united-kingdom--london/health/'),
 ]
 
 
@@ -157,12 +162,25 @@ def scrape_event_page(url: str, category: str) -> dict | None:
     return None
 
 
-def scrape_category(category: str, url: str) -> list[dict]:
+def scrape_category(category: str, base_url: str) -> list[dict]:
+    events = []
+    seen_ids = set()
+
+    for page_num in range(1, MAX_PAGES + 1):
+        url = f'{base_url}?page={page_num}' if page_num > 1 else base_url
+        page_events = _scrape_page(category, url, seen_ids)
+        if not page_events:
+            break
+        events.extend(page_events)
+
+    return events
+
+
+def _scrape_page(category: str, url: str, seen_ids: set) -> list[dict]:
     events = []
     try:
         resp = requests.get(url, headers=HEADERS, timeout=30)
         if resp.status_code != 200:
-            print(f'  Eventbrite {category}: HTTP {resp.status_code}')
             return []
 
         soup = BeautifulSoup(resp.text, 'lxml')
@@ -210,14 +228,21 @@ def scrape_category(category: str, url: str) -> list[dict]:
                 'price_min': None,
             })
 
+        # Deduplicate by source_id within this run
+        events = [e for e in events if e['source_id'] not in seen_ids]
+        for e in events:
+            seen_ids.add(e['source_id'])
+
         if events:
             return events
 
         # Fall back: collect individual event links and scrape each
-        links = extract_event_links(soup)
+        links = [l for l in extract_event_links(soup) if l not in seen_ids]
         for link in links:
+            seen_ids.add(link)
             ev = scrape_event_page(link, category)
-            if ev:
+            if ev and ev['source_id'] not in seen_ids:
+                seen_ids.add(ev['source_id'])
                 events.append(ev)
 
     except Exception as e:

@@ -5,7 +5,7 @@ Usage: python scrapers/run_all.py [--seed-only] [--no-browser]
 Options:
   --seed-only    Only insert the curated seed events (fastest, good for dev)
   --no-browser   Skip the venue scraper (which needs Playwright/Chromium)
-  (no flag)      Run all scrapers: seed + Ticketmaster + Eventbrite + Meetup + venues
+  (no flag)      Run all scrapers: Ticketmaster + Eventbrite + Luma + Skiddle + Meetup + venues
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(__file__))
@@ -39,27 +39,43 @@ def main():
     except Exception as e:
         print(f'  Ticketmaster error: {e}')
 
-    # 3. Eventbrite (community events, arts, tech — web scraping)
-    print('\n[3/5] Eventbrite...')
+    # 3. Eventbrite (community events, arts, tech — web scraping, 3 pages per category)
+    print('\n[3/6] Eventbrite...')
     try:
         from eventbrite_scraper import run as eb_run
         eb_run()
     except Exception as e:
         print(f'  Eventbrite error: {e}')
 
-    # 4. Meetup
-    print('\n[4/5] Meetup.com...')
+    # 4. Luma (tech, AI, startup, community events — no key needed)
+    print('\n[4/6] Luma...')
+    try:
+        from luma_scraper import run as luma_run
+        luma_run()
+    except Exception as e:
+        print(f'  Luma error: {e}')
+
+    # 5. Skiddle (UK music, club nights, comedy, theatre — free API key)
+    print('\n[5/6] Skiddle...')
+    try:
+        from skiddle_scraper import run as skiddle_run
+        skiddle_run()
+    except Exception as e:
+        print(f'  Skiddle error: {e}')
+
+    # 6. Meetup
+    print('\n[6/7] Meetup.com...')
     try:
         from meetup_scraper import run as meetup_run
         meetup_run()
     except Exception as e:
         print(f'  Meetup error: {e}')
 
-    # 5. Venue websites (requires Playwright/Chromium)
+    # 7. Venue websites (requires Playwright/Chromium)
     if no_browser:
-        print('\n[5/5] Venue websites skipped (--no-browser)')
+        print('\n[7/7] Venue websites skipped (--no-browser)')
     else:
-        print('\n[5/5] London venue websites...')
+        print('\n[7/7] London venue websites...')
         try:
             from london_venues_scraper import run as venue_run
             venue_run()
