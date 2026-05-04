@@ -1,12 +1,12 @@
 """
 Eventbrite scraper for London events.
-Uses the public Eventbrite API — requires EVENTBRITE_API_KEY in .env.local.
-Free tier allows 1000 calls/day which is plenty.
-
-Docs: https://www.eventbrite.com/platform/api
+Scrapes eventbrite.co.uk public listing pages — no API key required.
+The old v3/events/search/ API endpoint was deprecated in 2023 for free accounts.
 """
-import os, requests, re
+import os, re, json, requests
 from datetime import datetime, timezone
+from dateutil import parser as dateutil_parser
+from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from supabase import create_client
 
@@ -17,122 +17,228 @@ sb = create_client(
     os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or os.environ['NEXT_PUBLIC_SUPABASE_ANON_KEY'],
 )
 
-API_KEY = os.environ.get('EVENTBRITE_API_KEY', '')
-BASE = 'https://www.eventbriteapi.com/v3'
-
-# Eventbrite category IDs → our categories
-CATEGORY_MAP = {
-    '103': 'music',         # Music
-    '105': 'film',          # Film, Media & Entertainment
-    '108': 'tech',          # Science & Technology
-    '110': 'other',         # Travel & Outdoor
-    '111': 'comedy',        # Comedy
-    '113': 'art',           # Fine Art
-    '105': 'art',           # Performing Arts
-    '107': 'talk',          # Fashion
-    '109': 'talk',          # Sports & Fitness
-    '116': 'talk',          # Community & Culture
-    '101': 'other',         # Business & Professional
-    '102': 'other',         # Science & Technology (alt)
+HEADERS = {
+    'User-Agent': (
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
+        'AppleWebKit/537.36 (KHTML, like Gecko) '
+        'Chrome/124.0.0.0 Safari/537.36'
+    ),
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en-GB,en;q=0.9',
 }
 
-HEADERS = {'Authorization': f'Bearer {API_KEY}'}
+CATEGORY_PAGES = [
+    ('music',   'https://www.eventbrite.co.uk/d/united-kingdom--london/music/'),
+    ('art',     'https://www.eventbrite.co.uk/d/united-kingdom--london/visual-arts/'),
+    ('tech',    'https://www.eventbrite.co.uk/d/united-kingdom--london/science-and-tech/'),
+    ('comedy',  'https://www.eventbrite.co.uk/d/united-kingdom--london/comedy/'),
+    ('film',    'https://www.eventbrite.co.uk/d/united-kingdom--london/film-media/'),
+    ('talk',    'https://www.eventbrite.co.uk/d/united-kingdom--london/community/'),
+    ('theatre', 'https://www.eventbrite.co.uk/d/united-kingdom--london/performing-arts/'),
+]
 
 
-def fetch_events(category_id: str = None, page: int = 1) -> dict:
-    params = {
-        'location.address': 'London, United Kingdom',
-        'location.within': '30km',
-        'start_date.range_start': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
-        'expand': 'venue,ticket_availability',
-        'page': page,
-        'page_size': 50,
-    }
-    if category_id:
-        params['categories'] = category_id
-    resp = requests.get(f'{BASE}/events/search/', headers=HEADERS, params=params, timeout=30)
-    resp.raise_for_status()
-    return resp.json()
+def extract_json_ld(soup: BeautifulSoup) -> list[dict]:
+    events = []
+    for tag in soup.find_all('script', type='application/ld+json'):
+        try:
+            data = json.loads(tag.string or '')
+            items = data if isinstance(data, list) else [data]
+            for item in items:
+                if item.get('@type') in ('Event', 'MusicEvent', 'TheaterEvent', 'ScreeningEvent'):
+                    events.append(item)
+        except Exception:
+            pass
+    return events
 
 
-def clean_description(html: str) -> str:
-    clean = re.sub(r'<[^>]+>', ' ', html or '')
-    return re.sub(r'\s+', ' ', clean).strip()[:2000]
-
-
-def normalise(ev: dict) -> dict | None:
+def extract_server_data(html: str) -> list[dict]:
+    """Try to pull events from the React server-data JSON blob."""
+    match = re.search(r'window\.__SERVER_DATA__\s*=\s*(\{.+?\});\s*</script>', html, re.DOTALL)
+    if not match:
+        return []
     try:
-        venue = ev.get('venue') or {}
-        addr = venue.get('address') or {}
-        ta = ev.get('ticket_availability') or {}
-
-        start = ev['start']['utc']
-        end = ev['end']['utc'] if ev.get('end') else None
-
-        cat_id = str(ev.get('category_id', ''))
-        category = CATEGORY_MAP.get(cat_id, 'other')
-
-        # Rough price detection
-        is_free = ev.get('is_free', False)
-        price_min = None
-        if not is_free and ta.get('minimum_ticket_price'):
-            price_min = float(ta['minimum_ticket_price']['major_value'])
-
-        image_url = None
-        if ev.get('logo'):
-            image_url = ev['logo'].get('url')
-
-        return {
-            'title': ev['name']['text'][:500],
-            'description': clean_description(ev.get('description', {}).get('html', '')),
-            'start_datetime': start,
-            'end_datetime': end,
-            'venue_name': venue.get('name'),
-            'venue_address': addr.get('localized_address_display'),
-            'area': addr.get('city') or addr.get('region'),
-            'lat': float(addr['latitude']) if addr.get('latitude') else None,
-            'lng': float(addr['longitude']) if addr.get('longitude') else None,
-            'categories': [category],
-            'tags': [],
-            'people': [],
-            'image_url': image_url,
-            'event_url': ev.get('url'),
-            'source': 'eventbrite',
-            'source_id': ev['id'],
-            'is_free': is_free,
-            'price_min': price_min,
-        }
-    except Exception as e:
-        print(f'  Normalise error: {e}')
-        return None
+        data = json.loads(match.group(1))
+        # Navigate common paths — Eventbrite's schema changes over time
+        for path in [
+            ['components', 'search_results', 'events'],
+            ['components', 'eventSearch', 'events'],
+            ['page', 'value', 'search_data', 'events'],
+        ]:
+            node = data
+            for key in path:
+                node = node.get(key) if isinstance(node, dict) else None
+                if node is None:
+                    break
+            if isinstance(node, list):
+                return node
+    except Exception:
+        pass
+    return []
 
 
-def run(max_pages: int = 5):
-    if not API_KEY:
-        print('WARNING: No EVENTBRITE_API_KEY — skipping Eventbrite scraper')
-        return
+def extract_event_links(soup: BeautifulSoup) -> list[str]:
+    """Collect individual event page URLs from a listing page."""
+    links = set()
+    for a in soup.find_all('a', href=True):
+        href = a['href']
+        if re.match(r'https://www\.eventbrite\.co\.uk/e/[^?]+', href):
+            links.add(href.split('?')[0])
+    return list(links)[:30]
 
-    total = 0
-    # Fetch across key categories
-    for cat_id in ['103', '105', '108', '111', '116']:
-        for page in range(1, max_pages + 1):
+
+def scrape_event_page(url: str, category: str) -> dict | None:
+    """Fetch an individual event page and extract JSON-LD."""
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=20)
+        if resp.status_code != 200:
+            return None
+        soup = BeautifulSoup(resp.text, 'lxml')
+        ld_events = extract_json_ld(soup)
+        if ld_events:
+            item = ld_events[0]
+            start_raw = item.get('startDate', '')
+            if not start_raw:
+                return None
             try:
-                data = fetch_events(cat_id, page)
-                events = data.get('events', [])
-                if not events:
-                    break
+                start_dt = dateutil_parser.parse(start_raw)
+                if start_dt.tzinfo is None:
+                    start_dt = start_dt.replace(tzinfo=timezone.utc)
+                if start_dt < datetime.now(timezone.utc):
+                    return None
+                start_iso = start_dt.isoformat()
+            except Exception:
+                return None
 
-                to_insert = [n for ev in events if (n := normalise(ev))]
-                if to_insert:
-                    sb.table('events').upsert(to_insert, on_conflict='source,source_id').execute()
-                    total += len(to_insert)
-                    print(f'  Eventbrite cat={cat_id} page={page}: +{len(to_insert)} events')
+            location = item.get('location') or {}
+            address = location.get('address') or {}
+            venue_name = location.get('name') or address.get('name')
+            venue_addr = address.get('streetAddress') or address.get('addressLocality')
 
-                if not data.get('pagination', {}).get('has_more_items'):
-                    break
+            image = item.get('image')
+            if isinstance(image, list):
+                image = image[0] if image else None
+            elif isinstance(image, dict):
+                image = image.get('url')
+
+            offers = item.get('offers') or {}
+            if isinstance(offers, list):
+                offers = offers[0] if offers else {}
+            is_free = offers.get('price') in ('0', '0.00', 0, 0.0)
+            try:
+                price_min = float(offers.get('price', 0)) if not is_free else None
+            except Exception:
+                price_min = None
+
+            title = item.get('name', '')[:500]
+            slug = re.sub(r'[^a-z0-9]+', '-', title.lower())[:60]
+            return {
+                'title': title,
+                'description': (item.get('description') or '')[:2000],
+                'start_datetime': start_iso,
+                'end_datetime': item.get('endDate'),
+                'venue_name': venue_name,
+                'venue_address': venue_addr,
+                'area': address.get('addressLocality') or 'London',
+                'lat': None,
+                'lng': None,
+                'categories': [category],
+                'tags': [],
+                'people': [],
+                'image_url': image,
+                'event_url': url,
+                'source': 'eventbrite',
+                'source_id': f'eb-{slug}',
+                'is_free': is_free,
+                'price_min': price_min,
+            }
+    except Exception as e:
+        print(f'    Event page error {url}: {e}')
+    return None
+
+
+def scrape_category(category: str, url: str) -> list[dict]:
+    events = []
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=30)
+        if resp.status_code != 200:
+            print(f'  Eventbrite {category}: HTTP {resp.status_code}')
+            return []
+
+        soup = BeautifulSoup(resp.text, 'lxml')
+
+        # Try JSON-LD on the listing page first (sometimes present)
+        for item in extract_json_ld(soup):
+            start_raw = item.get('startDate', '')
+            if not start_raw:
+                continue
+            try:
+                start_dt = dateutil_parser.parse(start_raw)
+                if start_dt.tzinfo is None:
+                    start_dt = start_dt.replace(tzinfo=timezone.utc)
+                if start_dt < datetime.now(timezone.utc):
+                    continue
+            except Exception:
+                continue
+            location = item.get('location') or {}
+            address = location.get('address') or {}
+            image = item.get('image')
+            if isinstance(image, list):
+                image = image[0] if image else None
+            elif isinstance(image, dict):
+                image = image.get('url')
+            title = (item.get('name') or '')[:500]
+            slug = re.sub(r'[^a-z0-9]+', '-', title.lower())[:60]
+            events.append({
+                'title': title,
+                'description': (item.get('description') or '')[:2000],
+                'start_datetime': start_dt.isoformat(),
+                'end_datetime': item.get('endDate'),
+                'venue_name': location.get('name'),
+                'venue_address': address.get('streetAddress'),
+                'area': address.get('addressLocality') or 'London',
+                'lat': None,
+                'lng': None,
+                'categories': [category],
+                'tags': [],
+                'people': [],
+                'image_url': image,
+                'event_url': item.get('url'),
+                'source': 'eventbrite',
+                'source_id': f'eb-{slug}',
+                'is_free': False,
+                'price_min': None,
+            })
+
+        if events:
+            return events
+
+        # Fall back: collect individual event links and scrape each
+        links = extract_event_links(soup)
+        for link in links:
+            ev = scrape_event_page(link, category)
+            if ev:
+                events.append(ev)
+
+    except Exception as e:
+        print(f'  Eventbrite {category} error: {e}')
+
+    return events
+
+
+def run():
+    total = 0
+    for category, url in CATEGORY_PAGES:
+        events = scrape_category(category, url)
+        if events:
+            try:
+                sb.table('events').upsert(events, on_conflict='source,source_id').execute()
+                total += len(events)
+                print(f'  Eventbrite {category}: +{len(events)} events')
             except Exception as e:
-                print(f'  Eventbrite error cat={cat_id} page={page}: {e}')
-                break
+                print(f'  Eventbrite DB insert error ({category}): {e}')
+        else:
+            print(f'  Eventbrite {category}: 0 events (page may require JS)')
 
     print(f'Eventbrite done. Total inserted: {total}')
 
