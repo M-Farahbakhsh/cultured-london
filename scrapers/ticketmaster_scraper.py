@@ -18,38 +18,41 @@ sb = create_client(
 API_KEY = os.environ.get('TICKETMASTER_API_KEY', '')
 BASE = 'https://app.ticketmaster.com/discovery/v2'
 
+# Greater London centre + 30-mile radius covers O2, Wembley, Alexandra Palace, etc.
+LONDON_LAT = 51.5074
+LONDON_LNG = -0.1278
+RADIUS_MILES = 30
+
 SEGMENT_MAP = {
     'Music': 'music',
     'Arts & Theatre': 'theatre',
     'Film': 'film',
     'Sports': 'other',
     'Miscellaneous': 'other',
+    'Undefined': 'other',
 }
 
-GENRE_MAP = {
+GENRE_OVERRIDES = {
     'comedy': 'comedy',
     'stand-up': 'comedy',
+    'jazz': 'music',
     'classical': 'music',
     'opera': 'music',
-    'jazz': 'music',
     'rock': 'music',
     'pop': 'music',
-    'hip-hop/rap': 'music',
+    'hip-hop': 'music',
     'electronic': 'music',
-    'r&b': 'music',
-    'film': 'film',
-    'cinema': 'film',
-    'ballet': 'theatre',
     'dance': 'theatre',
-    'theatre': 'theatre',
+    'ballet': 'theatre',
     'musical': 'theatre',
     'exhibit': 'art',
-    'museum': 'art',
     'gallery': 'art',
-    'lecture': 'talk',
-    'conference': 'talk',
-    'talk': 'talk',
+    'film': 'film',
+    'cinema': 'film',
+    'comedy/humour': 'comedy',
     'technology': 'tech',
+    'conference': 'talk',
+    'lecture': 'talk',
 }
 
 
@@ -57,27 +60,29 @@ def get_category(ev: dict) -> str:
     for cls in ev.get('classifications', []):
         genre = cls.get('genre', {}).get('name', '').lower()
         subgenre = cls.get('subGenre', {}).get('name', '').lower()
-        segment = cls.get('segment', {}).get('name', '')
-        for key, cat in GENRE_MAP.items():
+        for key, cat in GENRE_OVERRIDES.items():
             if key in genre or key in subgenre:
                 return cat
+        segment = cls.get('segment', {}).get('name', '')
         if segment in SEGMENT_MAP:
             return SEGMENT_MAP[segment]
     return 'other'
 
 
-def fetch_page(page: int = 0, classification: str = None) -> dict:
+def fetch_page(page: int = 0, segment: str = None) -> dict:
     params = {
         'apikey': API_KEY,
-        'city': 'London',
+        'latlong': f'{LONDON_LAT},{LONDON_LNG}',
+        'radius': RADIUS_MILES,
+        'unit': 'miles',
         'countryCode': 'GB',
         'size': 200,
         'page': page,
         'sort': 'date,asc',
         'startDateTime': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
     }
-    if classification:
-        params['classificationName'] = classification
+    if segment:
+        params['segmentName'] = segment
     resp = requests.get(f'{BASE}/events.json', params=params, timeout=30)
     resp.raise_for_status()
     return resp.json()
@@ -95,17 +100,17 @@ def normalise(ev: dict) -> dict | None:
                 return None
             start_dt = f'{date_str}T{time_str}Z'
 
-        venues = ev.get('_embedded', {}).get('venues', [])
+        venues = (ev.get('_embedded') or {}).get('venues', [])
         venue = venues[0] if venues else {}
         venue_name = venue.get('name')
         venue_addr = venue.get('address', {}).get('line1')
-        city = venue.get('city', {}).get('name', 'London')
-        loc = venue.get('location', {})
+        city = venue.get('city', {}).get('name') or 'London'
+        loc = venue.get('location') or {}
         lat = float(loc['latitude']) if loc.get('latitude') else None
         lng = float(loc['longitude']) if loc.get('longitude') else None
 
         people = [
-            a['name'] for a in ev.get('_embedded', {}).get('attractions', [])[:5]
+            a['name'] for a in (ev.get('_embedded') or {}).get('attractions', [])[:5]
             if a.get('name')
         ]
 
@@ -118,7 +123,7 @@ def normalise(ev: dict) -> dict | None:
             image_url = ev['images'][0]['url']
 
         price_ranges = ev.get('priceRanges', [])
-        price_min = price_ranges[0].get('min') if price_ranges else None
+        price_min = float(price_ranges[0]['min']) if price_ranges else None
         is_free = price_min == 0 if price_min is not None else False
 
         return {
@@ -146,18 +151,26 @@ def normalise(ev: dict) -> dict | None:
         return None
 
 
-def run(max_pages: int = 5):
+def run():
     if not API_KEY:
         print('  No TICKETMASTER_API_KEY set.')
         print('  Get a free key at https://developer.ticketmaster.com')
         print('  Then add it to .env.local and GitHub Secrets as TICKETMASTER_API_KEY')
         return
 
+    # Ticketmaster hard-caps at page*size <= 1000 per search.
+    # Work around it by running separate searches per segment — each yields up to 1000 events.
+    # None = no filter (catch-all for unlabelled events)
+    segments = [None, 'Music', 'Arts & Theatre', 'Miscellaneous', 'Sports']
+    MAX_PAGES_PER_SEGMENT = 5  # 5 × 200 = 1000 per segment
+
     total = 0
-    for classification in ['Music', 'Arts & Theatre', 'Miscellaneous']:
-        for page in range(max_pages):
+    for segment in segments:
+        label = segment or 'All'
+        seg_total = 0
+        for page in range(MAX_PAGES_PER_SEGMENT):
             try:
-                data = fetch_page(page, classification)
+                data = fetch_page(page, segment)
                 embedded = data.get('_embedded') or {}
                 events = embedded.get('events', [])
                 if not events:
@@ -167,14 +180,17 @@ def run(max_pages: int = 5):
                 if to_insert:
                     sb.table('events').upsert(to_insert, on_conflict='source,source_id').execute()
                     total += len(to_insert)
-                    print(f'  Ticketmaster {classification} page {page + 1}: +{len(to_insert)} events')
+                    seg_total += len(to_insert)
 
                 page_meta = data.get('page', {})
-                if page >= page_meta.get('totalPages', 1) - 1:
+                if page >= min(page_meta.get('totalPages', 1), MAX_PAGES_PER_SEGMENT) - 1:
                     break
             except Exception as e:
-                print(f'  Ticketmaster error {classification} page {page + 1}: {e}')
+                # 400 = hit the deep-pagination cap, stop this segment
                 break
+
+        if seg_total:
+            print(f'  Ticketmaster [{label}]: +{seg_total} events')
 
     print(f'Ticketmaster done. Total inserted: {total}')
 
