@@ -101,28 +101,30 @@ def fetch_event_description(slug: str) -> str:
     return ''
 
 
-def fetch_luma_events() -> list[dict]:
-    url = 'https://lu.ma/london'
+LONDON_LAT = 51.5074
+LONDON_LNG = -0.1278
+LONDON_PLACE_ID = 'discplace-QCcNk3HXowOR97j'
+API_BASE = 'https://api.lu.ma/discover/get-paginated-events'
+
+
+def _fetch_api(params: dict) -> list[dict]:
+    """Fetch events from the Luma discover API with the given params."""
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=20)
+        resp = requests.get(API_BASE, params=params, headers=HEADERS, timeout=20)
         resp.raise_for_status()
+        return resp.json().get('entries', [])
     except Exception as e:
-        print(f'  Luma fetch error: {e}')
+        print(f'  Luma API fetch error {params}: {e}')
         return []
 
-    match = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.+?)</script>', resp.text, re.DOTALL)
-    if not match:
-        print('  Luma: no __NEXT_DATA__ found in page')
-        return []
 
-    try:
-        data = json.loads(match.group(1))
-        page_data = data['props']['pageProps']['initialData']['data']
-        raw_events = page_data.get('events', []) + page_data.get('featured_events', [])
-        return raw_events
-    except Exception as e:
-        print(f'  Luma JSON parse error: {e}')
-        return []
+def fetch_luma_events() -> list[dict]:
+    # Two different API calls return two different (non-overlapping) sets of London events.
+    # Combining both gives ~68 events vs ~27 from either alone.
+    place_events = _fetch_api({'place_api_id': LONDON_PLACE_ID})
+    latlon_events = _fetch_api({'latitude': LONDON_LAT, 'longitude': LONDON_LNG})
+    print(f'  Luma: {len(place_events)} from place API, {len(latlon_events)} from lat/lng API')
+    return place_events + latlon_events
 
 
 def normalise(item: dict) -> dict | None:
