@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const PROTECTED = ['/explore', '/saved', '/profile', '/friends', '/past-events', '/onboarding']
+const PROTECTED = ['/home', '/explore', '/saved', '/profile', '/friends', '/past-events', '/onboarding']
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -35,7 +35,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (user && path === '/') {
-    return NextResponse.redirect(new URL('/explore', request.url))
+    return NextResponse.redirect(new URL('/home', request.url))
   }
 
   return supabaseResponse

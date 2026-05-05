@@ -69,7 +69,7 @@ export default function OnboardingPage() {
       await supabase.from('interests')
         .upsert({ user_id: userId, type: 'genre', name: t, metadata: {} }, { onConflict: 'user_id,type,name' })
     }
-    router.push('/explore')
+    router.push('/home')
   }
 
   const StepIcon = STEPS[step - 1].icon
@@ -166,7 +166,7 @@ export default function OnboardingPage() {
             {step > 1 ? (
               <button onClick={() => setStep(s => s - 1)} className="btn-ghost">Back</button>
             ) : (
-              <button onClick={() => router.push('/explore')} className="btn-ghost text-muted">
+              <button onClick={() => router.push('/home')} className="btn-ghost text-muted">
                 Skip all
               </button>
             )}

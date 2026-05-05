@@ -40,7 +40,7 @@ export default function LandingPage() {
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) { setError(error.message); setLoading(false); return }
-      router.push('/explore')
+      router.push('/home')
     }
     router.refresh()
   }
