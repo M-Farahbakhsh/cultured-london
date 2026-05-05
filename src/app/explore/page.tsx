@@ -30,29 +30,40 @@ async function EventGrid({ searchParams }: PageProps) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  let query = supabase
-    .from('events')
-    .select('*', { count: 'exact' })
-    .gte('start_datetime', new Date().toISOString())
-    .order('start_datetime', { ascending: true })
-    .range(offset, offset + PAGE_SIZE - 1)
+  const now = new Date().toISOString()
+  const farFuture = '2099-01-01T00:00:00Z'
 
-  if (params.category && params.category !== 'all') {
-    query = query.contains('categories', [params.category])
-  }
-  if (params.free === 'true') {
-    query = query.eq('is_free', true)
-  }
-  if (params.search) {
-    query = query.ilike('title', `%${params.search}%`)
-  }
+  let fromTime = now
+  let toTime = farFuture
   if (params.date && params.date !== 'all') {
-    const { from, to } = getDateRange(params.date as DateFilter)
-    query = query.gte('start_datetime', from.toISOString()).lt('start_datetime', to.toISOString())
+    const range = getDateRange(params.date as DateFilter)
+    fromTime = range.from.toISOString()
+    toTime = range.to.toISOString()
   }
 
-  const { data: events = [], count } = await query
-  const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE)
+  const rpcParams = {
+    p_from_time: fromTime,
+    p_to_time:   toTime,
+    p_category:  (params.category && params.category !== 'all') ? params.category : null,
+    p_is_free:   params.free === 'true' ? true : null,
+    p_search:    params.search || null,
+    p_limit:     PAGE_SIZE,
+    p_offset:    offset,
+  }
+
+  const [{ data: events }, { data: countData }] = await Promise.all([
+    supabase.rpc('get_unique_events', rpcParams),
+    supabase.rpc('count_unique_events', {
+      p_from_time: rpcParams.p_from_time,
+      p_to_time:   rpcParams.p_to_time,
+      p_category:  rpcParams.p_category,
+      p_is_free:   rpcParams.p_is_free,
+      p_search:    rpcParams.p_search,
+    }),
+  ])
+
+  const count = (countData as number) ?? 0
+  const totalPages = Math.ceil(count / PAGE_SIZE)
 
   let savedIds = new Set<string>()
   let userInterests: string[] = []
@@ -66,7 +77,7 @@ async function EventGrid({ searchParams }: PageProps) {
     userInterests = (interests ?? []).map(i => i.name.toLowerCase())
   }
 
-  const enriched: Event[] = (events ?? []).map(ev => {
+  const enriched: Event[] = ((events ?? []) as Event[]).map(ev => {
     const peopleMatch = ev.people?.filter((p: string) =>
       userInterests.some(i => p.toLowerCase().includes(i) || i.includes(p.toLowerCase()))
     )
