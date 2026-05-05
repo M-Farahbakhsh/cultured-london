@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Bookmark, BookmarkCheck, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import type { Event, Category } from '@/lib/types'
-import { CATEGORY_GRADIENTS, formatDateRange, formatPrice } from '@/lib/utils'
+import { CATEGORY_GRADIENTS, formatDate, formatTime, formatPrice } from '@/lib/utils'
 import CategoryChip from './CategoryChip'
 import { createClient } from '@/lib/supabase/client'
 
@@ -82,7 +82,7 @@ export default function EventCard({ event, initialSaved = false }: Props) {
         </h3>
 
         <div className="space-y-1 text-xs text-muted">
-          <p>{formatDateRange(event.start_datetime, event.last_occurrence)}</p>
+          <p>{formatDate(event.start_datetime)} · {formatTime(event.start_datetime)}</p>
           {event.venue_name && (
             <p className="truncate">{event.venue_name}{event.area ? ` · ${event.area}` : ''}</p>
           )}
