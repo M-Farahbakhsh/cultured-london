@@ -27,7 +27,7 @@ HEADERS = {
     'Accept-Language': 'en-GB,en;q=0.9',
 }
 
-MAX_PAGES = 3  # pages to scrape per category
+MAX_PAGES = 5  # pages to scrape per category
 
 CATEGORY_PAGES = [
     ('music',   'https://www.eventbrite.co.uk/d/united-kingdom--london/music/'),
@@ -40,6 +40,14 @@ CATEGORY_PAGES = [
     ('other',   'https://www.eventbrite.co.uk/d/united-kingdom--london/food-and-drink/'),
     ('talk',    'https://www.eventbrite.co.uk/d/united-kingdom--london/business/'),
     ('other',   'https://www.eventbrite.co.uk/d/united-kingdom--london/health/'),
+    ('other',   'https://www.eventbrite.co.uk/d/united-kingdom--london/sports-fitness/'),
+    ('talk',    'https://www.eventbrite.co.uk/d/united-kingdom--london/networking/'),
+    ('other',   'https://www.eventbrite.co.uk/d/united-kingdom--london/family-education/'),
+    ('other',   'https://www.eventbrite.co.uk/d/united-kingdom--london/fashion/'),
+    ('other',   'https://www.eventbrite.co.uk/d/united-kingdom--london/charity-causes/'),
+    ('other',   'https://www.eventbrite.co.uk/d/united-kingdom--london/travel-outdoor/'),
+    ('art',     'https://www.eventbrite.co.uk/d/united-kingdom--london/hobbies/'),
+    ('other',   'https://www.eventbrite.co.uk/d/united-kingdom--london/spirituality/'),
 ]
 
 

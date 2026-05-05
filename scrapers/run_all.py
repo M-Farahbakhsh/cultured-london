@@ -5,7 +5,7 @@ Usage: python scrapers/run_all.py [--seed-only] [--no-browser]
 Options:
   --seed-only    Only insert the curated seed events (fastest, good for dev)
   --no-browser   Skip the venue scraper (which needs Playwright/Chromium)
-  (no flag)      Run all scrapers: Ticketmaster + Eventbrite + Luma + Skiddle + Meetup + venues
+  (no flag)      Run all scrapers: Ticketmaster + Eventbrite + Luma + Skiddle + Songkick + Meetup + venues
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(__file__))
@@ -61,26 +61,34 @@ def main():
         print(f'  Luma error: {e}')
 
     # 5. Skiddle (UK music, club nights, comedy, theatre — free API key)
-    print('\n[5/6] Skiddle...')
+    print('\n[5/7] Skiddle...')
     try:
         from skiddle_scraper import run as skiddle_run
         skiddle_run()
     except Exception as e:
         print(f'  Skiddle error: {e}')
 
-    # 6. Meetup
-    print('\n[6/7] Meetup.com...')
+    # 6. Songkick (London concerts and live music — no key needed)
+    print('\n[6/8] Songkick...')
+    try:
+        from songkick_scraper import run as sk_run
+        sk_run()
+    except Exception as e:
+        print(f'  Songkick error: {e}')
+
+    # 7. Meetup
+    print('\n[7/8] Meetup.com...')
     try:
         from meetup_scraper import run as meetup_run
         meetup_run()
     except Exception as e:
         print(f'  Meetup error: {e}')
 
-    # 7. Venue websites (requires Playwright/Chromium)
+    # 8. Venue websites (requires Playwright/Chromium)
     if no_browser:
-        print('\n[7/7] Venue websites skipped (--no-browser)')
+        print('\n[8/8] Venue websites skipped (--no-browser)')
     else:
-        print('\n[7/7] London venue websites...')
+        print('\n[8/8] London venue websites...')
         try:
             from london_venues_scraper import run as venue_run
             venue_run()
