@@ -4,6 +4,7 @@ Scrapes the public London discovery page — no API key required.
 Mostly tech, AI, startup, and community events.
 """
 import os, re, json, time, requests
+from html import unescape
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 from supabase import create_client
@@ -42,12 +43,17 @@ def guess_category(name: str) -> str:
 def clean_text(raw: str) -> str:
     if not raw:
         return ''
-    text = re.sub(r'<[^>]+>', ' ', raw)
+    text = unescape(raw)  # decode &#x27; &amp; etc.
+    text = re.sub(r'<[^>]+>', ' ', text)
     text = re.sub(r'\*{1,3}([^*\n]+)\*{1,3}', r'\1', text)
     text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)
     text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
     text = re.sub(r'`[^`]+`', '', text)
     text = re.sub(r'\s+', ' ', text).strip()
+    # Strip common boilerplate prefixes
+    for prefix in ('About the event ', 'About this event '):
+        if text.startswith(prefix):
+            text = text[len(prefix):]
     return text[:2000]
 
 
