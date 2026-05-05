@@ -39,6 +39,26 @@ export function formatTime(iso: string): string {
   })
 }
 
+export function formatDateRange(start: string, last: string | null | undefined): string {
+  const startDate = new Date(start)
+  const startDay = startDate.toDateString()
+
+  if (!last) {
+    return `${formatDate(start)} · ${formatTime(start)}`
+  }
+
+  const lastDate = new Date(last)
+  if (lastDate.toDateString() === startDay) {
+    // Same day — single datetime
+    return `${formatDate(start)} · ${formatTime(start)}`
+  }
+
+  // Multi-day run — show range
+  const startStr = startDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+  const lastStr  = lastDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+  return `${startStr} – ${lastStr}`
+}
+
 export function formatPrice(min: number | null, max: number | null, free: boolean): string {
   if (free) return 'Free'
   if (!min && !max) return 'Check website'

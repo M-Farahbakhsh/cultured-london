@@ -25,6 +25,8 @@ export interface Event {
   price_max: number | null
   is_free: boolean
   created_at: string
+  // added by get_unique_events() — last day this event runs
+  last_occurrence?: string | null
   // computed client-side
   match_score?: number
   match_reason?: string
