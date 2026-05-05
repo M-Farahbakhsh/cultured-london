@@ -3,7 +3,7 @@ Luma (lu.ma) scraper for London events.
 Scrapes the public London discovery page — no API key required.
 Mostly tech, AI, startup, and community events.
 """
-import os, re, json, requests
+import os, re, json, time, requests
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 from supabase import create_client
@@ -37,6 +37,46 @@ def guess_category(name: str) -> str:
         if any(k in text for k in keywords):
             return cat
     return 'other'
+
+
+def clean_text(raw: str) -> str:
+    if not raw:
+        return ''
+    text = re.sub(r'<[^>]+>', ' ', raw)
+    text = re.sub(r'\*{1,3}([^*\n]+)\*{1,3}', r'\1', text)
+    text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)
+    text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
+    text = re.sub(r'`[^`]+`', '', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text[:2000]
+
+
+def fetch_event_description(slug: str) -> str:
+    """Fetch individual Luma event page to get the full description."""
+    try:
+        resp = requests.get(f'https://lu.ma/{slug}', headers=HEADERS, timeout=15)
+        if resp.status_code != 200:
+            return ''
+        match = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.+?)</script>', resp.text, re.DOTALL)
+        if not match:
+            return ''
+        data = json.loads(match.group(1))
+        # Try common paths to the event description
+        for path in [
+            ['props', 'pageProps', 'initialData', 'data', 'event', 'description'],
+            ['props', 'pageProps', 'initialData', 'data', 'event', 'desc_md'],
+            ['props', 'pageProps', 'event', 'description'],
+        ]:
+            node = data
+            for key in path:
+                node = node.get(key) if isinstance(node, dict) else None
+                if node is None:
+                    break
+            if isinstance(node, str) and node.strip():
+                return clean_text(node)
+    except Exception:
+        pass
+    return ''
 
 
 def fetch_luma_events() -> list[dict]:
@@ -92,15 +132,13 @@ def normalise(item: dict) -> dict | None:
 
         name = ev.get('name', '')
 
-        # Extract and clean description (may be markdown or HTML)
-        raw_desc = ev.get('description') or ev.get('desc_md') or item.get('description') or ''
-        raw_desc = re.sub(r'<[^>]+>', ' ', raw_desc)           # strip HTML tags
-        raw_desc = re.sub(r'\*{1,3}([^*\n]+)\*{1,3}', r'\1', raw_desc)  # strip bold/italic
-        raw_desc = re.sub(r'^#+\s+', '', raw_desc, flags=re.MULTILINE)   # strip headings
-        raw_desc = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', raw_desc)    # strip links
-        raw_desc = re.sub(r'`[^`]+`', '', raw_desc)            # strip code
-        raw_desc = re.sub(r'\s+', ' ', raw_desc).strip()
-        description = raw_desc[:2000]
+        # Try to get description from listing data first
+        description = clean_text(
+            ev.get('description') or ev.get('desc_md') or item.get('description') or ''
+        )
+
+        event_url_slug = ev.get('url', '')
+        event_url = f'https://lu.ma/{event_url_slug}' if event_url_slug else None
 
         ticket_info = item.get('ticket_info') or {}
         is_free = not ticket_info.get('is_paid', False)
@@ -108,12 +146,10 @@ def normalise(item: dict) -> dict | None:
         if not is_free:
             price_min = ticket_info.get('price', {}).get('amount')
 
-        event_url_slug = ev.get('url', '')
-        event_url = f'https://lu.ma/{event_url_slug}' if event_url_slug else None
-
         return {
             'title': name[:500],
             'description': description,
+            '_slug': event_url_slug,   # temporary, used to fetch description below
             'start_datetime': start,
             'end_datetime': ev.get('end_at'),
             'venue_name': venue_name,
@@ -150,16 +186,29 @@ def run():
         if n:
             to_insert.append(n)
 
-    if to_insert:
+    # For events missing a description, fetch individual event pages
+    missing = [e for e in to_insert if not e.get('description') and e.get('_slug')]
+    if missing:
+        print(f'  Luma: fetching descriptions for {len(missing)} events...')
+        for e in missing:
+            desc = fetch_event_description(e['_slug'])
+            if desc:
+                e['description'] = desc
+            time.sleep(0.4)  # polite delay
+
+    # Remove the temporary _slug field before inserting
+    db_events = [{k: v for k, v in e.items() if k != '_slug'} for e in to_insert]
+
+    if db_events:
         try:
-            sb.table('events').upsert(to_insert, on_conflict='source,source_id').execute()
-            print(f'  Luma: +{len(to_insert)} events')
+            sb.table('events').upsert(db_events, on_conflict='source,source_id').execute()
+            print(f'  Luma: +{len(db_events)} events')
         except Exception as e:
             print(f'  Luma DB insert error: {e}')
     else:
         print('  Luma: 0 events')
 
-    print(f'Luma done. Total inserted: {len(to_insert)}')
+    print(f'Luma done. Total inserted: {len(db_events)}')
 
 
 if __name__ == '__main__':
