@@ -98,6 +98,26 @@ export default function EventCard({ event, initialSaved = false }: Props) {
             <span>{event.match_reason}</span>
           </div>
         )}
+
+        {/* Hover preview — slides in on desktop hover */}
+        {(event.description || (event.people && event.people.length > 0) || (event.tags && event.tags.length > 0)) && (
+          <div className="overflow-hidden max-h-0 group-hover:max-h-32 transition-all duration-200 ease-out">
+            <div className="pt-2.5 mt-2.5 border-t border-border">
+              {event.description ? (
+                <p className="text-xs text-muted line-clamp-3 leading-relaxed">{event.description}</p>
+              ) : (
+                <div className="space-y-1">
+                  {event.people && event.people.length > 0 && (
+                    <p className="text-xs text-muted">With {event.people.slice(0, 3).join(', ')}</p>
+                  )}
+                  {event.tags && event.tags.length > 0 && (
+                    <p className="text-xs text-muted/60">{event.tags.slice(0, 5).map(t => `#${t}`).join(' ')}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </Link>
   )
