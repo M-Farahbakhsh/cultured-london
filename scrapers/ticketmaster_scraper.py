@@ -3,7 +3,7 @@ Ticketmaster Discovery API scraper for London events.
 Free API key at: https://developer.ticketmaster.com  (sign up → My Apps → Create new key)
 Add TICKETMASTER_API_KEY to .env.local and to GitHub Secrets.
 """
-import os, requests
+import os, re, requests
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 from supabase import create_client
@@ -88,6 +88,31 @@ def fetch_page(page: int = 0, segment: str = None) -> dict:
     return resp.json()
 
 
+def build_description(ev: dict, venue_name: str | None, people: list[str]) -> str:
+    parts = []
+    for field in ('info', 'pleaseNote', 'description'):
+        val = (ev.get(field) or '').strip()
+        if val:
+            parts.append(re.sub(r'\s+', ' ', val))
+    if parts:
+        return ' '.join(parts)[:2000]
+    # Fallback: build a brief description from structured data
+    summary = []
+    if people:
+        summary.append(f'Featuring {", ".join(people[:3])}.')
+    if venue_name:
+        summary.append(f'At {venue_name}.')
+    for cls in ev.get('classifications', []):
+        genre = cls.get('genre', {}).get('name', '')
+        subgenre = cls.get('subGenre', {}).get('name', '')
+        if genre and genre not in ('Undefined', 'Other'):
+            summary.append(genre)
+        if subgenre and subgenre not in ('Undefined', 'Other', genre):
+            summary.append(subgenre)
+        break
+    return ' '.join(summary)[:2000]
+
+
 def normalise(ev: dict) -> dict | None:
     try:
         dates = ev.get('dates', {})
@@ -128,7 +153,7 @@ def normalise(ev: dict) -> dict | None:
 
         return {
             'title': ev['name'][:500],
-            'description': '',
+            'description': build_description(ev, venue_name, people),
             'start_datetime': start_dt,
             'end_datetime': None,
             'venue_name': venue_name,

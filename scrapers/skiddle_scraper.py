@@ -4,7 +4,7 @@ Skiddle is a UK-focused events listing site with excellent London coverage.
 Get a free API key at: https://www.skiddle.com/api/
 Add SKIDDLE_API_KEY to .env.local and to GitHub Secrets.
 """
-import os, requests
+import os, re, requests
 from datetime import datetime, timezone, date
 from dotenv import load_dotenv
 from supabase import create_client
@@ -77,9 +77,17 @@ def normalise(ev: dict, category: str) -> dict | None:
         title = ev.get('eventname', '')
         source_id = str(ev.get('id', ''))
 
+        raw_desc = ev.get('description') or ''
+        raw_desc = re.sub(r'<[^>]+>', ' ', raw_desc)
+        raw_desc = re.sub(r'&amp;', '&', raw_desc)
+        raw_desc = re.sub(r'&lt;', '<', raw_desc)
+        raw_desc = re.sub(r'&gt;', '>', raw_desc)
+        raw_desc = re.sub(r'&nbsp;', ' ', raw_desc)
+        raw_desc = re.sub(r'\s+', ' ', raw_desc).strip()
+
         return {
             'title': title[:500],
-            'description': (ev.get('description') or '')[:2000],
+            'description': raw_desc[:2000],
             'start_datetime': start_iso,
             'end_datetime': None,
             'venue_name': venue.get('name'),

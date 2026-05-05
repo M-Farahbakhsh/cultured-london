@@ -91,6 +91,17 @@ def normalise(item: dict) -> dict | None:
         lng = coord.get('longitude')
 
         name = ev.get('name', '')
+
+        # Extract and clean description (may be markdown or HTML)
+        raw_desc = ev.get('description') or ev.get('desc_md') or item.get('description') or ''
+        raw_desc = re.sub(r'<[^>]+>', ' ', raw_desc)           # strip HTML tags
+        raw_desc = re.sub(r'\*{1,3}([^*\n]+)\*{1,3}', r'\1', raw_desc)  # strip bold/italic
+        raw_desc = re.sub(r'^#+\s+', '', raw_desc, flags=re.MULTILINE)   # strip headings
+        raw_desc = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', raw_desc)    # strip links
+        raw_desc = re.sub(r'`[^`]+`', '', raw_desc)            # strip code
+        raw_desc = re.sub(r'\s+', ' ', raw_desc).strip()
+        description = raw_desc[:2000]
+
         ticket_info = item.get('ticket_info') or {}
         is_free = not ticket_info.get('is_paid', False)
         price_min = None
@@ -102,7 +113,7 @@ def normalise(item: dict) -> dict | None:
 
         return {
             'title': name[:500],
-            'description': '',
+            'description': description,
             'start_datetime': start,
             'end_datetime': ev.get('end_at'),
             'venue_name': venue_name,

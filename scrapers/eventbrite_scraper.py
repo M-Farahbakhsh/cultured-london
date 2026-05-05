@@ -43,6 +43,16 @@ CATEGORY_PAGES = [
 ]
 
 
+def clean_description(raw: str) -> str:
+    if not raw:
+        return ''
+    text = re.sub(r'<[^>]+>', ' ', raw)
+    text = text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>') \
+               .replace('&nbsp;', ' ').replace('&quot;', '"').replace('&#39;', "'")
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text[:2000]
+
+
 def extract_json_ld(soup: BeautifulSoup) -> list[dict]:
     events = []
     for tag in soup.find_all('script', type='application/ld+json'):
@@ -139,7 +149,7 @@ def scrape_event_page(url: str, category: str) -> dict | None:
             slug = re.sub(r'[^a-z0-9]+', '-', title.lower())[:60]
             return {
                 'title': title,
-                'description': (item.get('description') or '')[:2000],
+                'description': clean_description(item.get('description') or ''),
                 'start_datetime': start_iso,
                 'end_datetime': item.get('endDate'),
                 'venue_name': venue_name,
@@ -209,7 +219,7 @@ def _scrape_page(category: str, url: str, seen_ids: set) -> list[dict]:
             slug = re.sub(r'[^a-z0-9]+', '-', title.lower())[:60]
             events.append({
                 'title': title,
-                'description': (item.get('description') or '')[:2000],
+                'description': clean_description(item.get('description') or ''),
                 'start_datetime': start_dt.isoformat(),
                 'end_datetime': item.get('endDate'),
                 'venue_name': location.get('name'),
