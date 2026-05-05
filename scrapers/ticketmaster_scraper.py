@@ -164,6 +164,11 @@ def run():
     segments = [None, 'Music', 'Arts & Theatre', 'Miscellaneous', 'Sports']
     MAX_PAGES_PER_SEGMENT = 5  # 5 × 200 = 1000 per segment
 
+    # Track (title, venue, date) across all segments to avoid time-slot duplicates.
+    # Ticketmaster lists timed-entry attractions (e.g. museum at 10:00, 11:00, 12:00...)
+    # as separate events — we only want one per attraction per day.
+    seen_slots: set[tuple] = set()
+
     total = 0
     for segment in segments:
         label = segment or 'All'
@@ -176,11 +181,24 @@ def run():
                 if not events:
                     break
 
-                to_insert = [n for ev in events if (n := normalise(ev))]
-                if to_insert:
-                    sb.table('events').upsert(to_insert, on_conflict='source,source_id').execute()
-                    total += len(to_insert)
-                    seg_total += len(to_insert)
+                normalised = [n for ev in events if (n := normalise(ev))]
+
+                # Deduplicate time-slotted events
+                deduped = []
+                for ev in normalised:
+                    slot_key = (
+                        ev['title'].lower(),
+                        (ev['venue_name'] or '').lower(),
+                        ev['start_datetime'][:10],
+                    )
+                    if slot_key not in seen_slots:
+                        seen_slots.add(slot_key)
+                        deduped.append(ev)
+
+                if deduped:
+                    sb.table('events').upsert(deduped, on_conflict='source,source_id').execute()
+                    total += len(deduped)
+                    seg_total += len(deduped)
 
                 page_meta = data.get('page', {})
                 if page >= min(page_meta.get('totalPages', 1), MAX_PAGES_PER_SEGMENT) - 1:
