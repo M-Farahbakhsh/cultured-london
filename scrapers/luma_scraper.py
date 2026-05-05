@@ -57,23 +57,39 @@ def fetch_event_description(slug: str) -> str:
         resp = requests.get(f'https://lu.ma/{slug}', headers=HEADERS, timeout=15)
         if resp.status_code != 200:
             return ''
-        match = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.+?)</script>', resp.text, re.DOTALL)
-        if not match:
-            return ''
-        data = json.loads(match.group(1))
-        # Try common paths to the event description
-        for path in [
-            ['props', 'pageProps', 'initialData', 'data', 'event', 'description'],
-            ['props', 'pageProps', 'initialData', 'data', 'event', 'desc_md'],
-            ['props', 'pageProps', 'event', 'description'],
+        html = resp.text
+
+        # Try __NEXT_DATA__ JSON (works when Luma serves SSR)
+        nd_match = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.+?)</script>', html, re.DOTALL)
+        if nd_match:
+            try:
+                data = json.loads(nd_match.group(1))
+                for path in [
+                    ['props', 'pageProps', 'initialData', 'data', 'event', 'description'],
+                    ['props', 'pageProps', 'initialData', 'data', 'event', 'desc_md'],
+                    ['props', 'pageProps', 'event', 'description'],
+                    ['props', 'pageProps', 'data', 'event', 'description'],
+                ]:
+                    node = data
+                    for key in path:
+                        node = node.get(key) if isinstance(node, dict) else None
+                        if node is None:
+                            break
+                    if isinstance(node, str) and node.strip():
+                        return clean_text(node)
+            except Exception:
+                pass
+
+        # Fall back to OpenGraph / meta description tags — always present
+        for pattern in [
+            r'<meta[^>]+property=["\']og:description["\'][^>]+content=["\']([^"\']{20,})["\']',
+            r'<meta[^>]+content=["\']([^"\']{20,})["\'][^>]+property=["\']og:description["\']',
+            r'<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']{20,})["\']',
+            r'<meta[^>]+content=["\']([^"\']{20,})["\'][^>]+name=["\']description["\']',
         ]:
-            node = data
-            for key in path:
-                node = node.get(key) if isinstance(node, dict) else None
-                if node is None:
-                    break
-            if isinstance(node, str) and node.strip():
-                return clean_text(node)
+            m = re.search(pattern, html, re.IGNORECASE | re.DOTALL)
+            if m:
+                return clean_text(m.group(1))
     except Exception:
         pass
     return ''
