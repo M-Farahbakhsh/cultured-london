@@ -16,6 +16,7 @@ interface Props {
 export default function EventCard({ event, initialSaved = false }: Props) {
   const [saved, setSaved] = useState(initialSaved || event.saved || false)
   const [saving, setSaving] = useState(false)
+  const [imgFailed, setImgFailed] = useState(false)
   const supabase = createClient()
 
   const primaryCategory = (event.categories?.[0] ?? 'other') as Category
@@ -42,10 +43,11 @@ export default function EventCard({ event, initialSaved = false }: Props) {
     <Link href={`/events/${event.id}`} className="card group block">
       {/* Image / gradient header */}
       <div className="relative h-40 overflow-hidden">
-        {event.image_url ? (
+        {event.image_url && !imgFailed ? (
           <img
             src={event.image_url}
             alt={event.title}
+            onError={() => setImgFailed(true)}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
