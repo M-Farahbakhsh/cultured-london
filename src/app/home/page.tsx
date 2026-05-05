@@ -7,6 +7,8 @@ import EventRow from '@/components/EventRow'
 import type { Event } from '@/lib/types'
 import { getDateRange, formatDate } from '@/lib/utils'
 
+export const dynamic = 'force-dynamic'
+
 export default async function HomePage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

@@ -202,8 +202,8 @@ def run():
         if n:
             to_insert.append(n)
 
-    # For events missing a description, fetch individual event pages
-    missing = [e for e in to_insert if not e.get('description') and e.get('_slug')]
+    # Fetch individual event pages for any event with a short or missing description
+    missing = [e for e in to_insert if len(e.get('description') or '') < 150 and e.get('_slug')]
     if missing:
         print(f'  Luma: fetching descriptions for {len(missing)} events...')
         for e in missing:
