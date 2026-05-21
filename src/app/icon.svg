@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Blue rounded-square background -->
+  <rect width="32" height="32" rx="8" fill="#2563EB"/>
+  <!-- White map pin -->
+  <path d="M16 4C11.582 4 8 7.582 8 12c0 5.25 8 16 8 16s8-10.75 8-16C24 7.582 20.418 4 16 4z" fill="white"/>
+  <!-- Blue inner dot -->
+  <circle cx="16" cy="12" r="3" fill="#2563EB"/>
+</svg>
