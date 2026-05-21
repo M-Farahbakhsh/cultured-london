@@ -4,14 +4,27 @@ import { createClient } from '@/lib/supabase/server'
 import Nav from '@/components/Nav'
 import EventCard from '@/components/EventCard'
 import FilterBar from '@/components/FilterBar'
+import MapView from '@/components/MapView'
 import type { Event, Category, DateFilter } from '@/lib/types'
 import { getDateRange } from '@/lib/utils'
 
 const PAGE_SIZE = 60
 
 interface PageProps {
-  searchParams: Promise<{ category?: string; date?: string; free?: string; search?: string; page?: string }>
+  searchParams: Promise<{
+    category?: string
+    date?: string
+    free?: string
+    search?: string
+    page?: string
+    view?: string
+    from?: string
+    time_from?: string
+    time_to?: string
+  }>
 }
+
+type ResolvedParams = Awaited<PageProps['searchParams']>
 
 function buildUrl(params: Record<string, string | undefined>, overrides: Record<string, string | undefined>) {
   const merged = { ...params, ...overrides }
@@ -22,47 +35,96 @@ function buildUrl(params: Record<string, string | undefined>, overrides: Record<
   return `/explore${qs ? `?${qs}` : ''}`
 }
 
+function buildRpcBase(params: ResolvedParams) {
+  const now = new Date().toISOString()
+  const farFuture = '2099-01-01T00:00:00Z'
+  let fromTime = now
+  let toTime = farFuture
+
+  if (params.date && params.date !== 'all') {
+    if (params.date === 'custom' && params.from) {
+      const day = new Date(params.from)
+      fromTime = day.toISOString()
+      const nextDay = new Date(day)
+      nextDay.setDate(nextDay.getDate() + 1)
+      toTime = nextDay.toISOString()
+    } else if (params.date !== 'custom') {
+      const range = getDateRange(params.date as DateFilter)
+      fromTime = range.from.toISOString()
+      toTime = range.to.toISOString()
+    }
+  }
+
+  return {
+    p_from_time: fromTime,
+    p_to_time: toTime,
+    p_category: (params.category && params.category !== 'all') ? params.category : null,
+    p_is_free: params.free === 'true' ? true : null,
+    p_search: params.search || null,
+  }
+}
+
+function filterByTimeOfDay(events: Event[], timeFrom: string | undefined, timeTo: string | undefined): Event[] {
+  if (!timeFrom && !timeTo) return events
+
+  const toMinutes = (t: string) => {
+    const [h, m] = t.split(':').map(Number)
+    return h * 60 + (m || 0)
+  }
+  const fromMin = timeFrom ? toMinutes(timeFrom) : 0
+  const toMin = timeTo ? toMinutes(timeTo) : 23 * 60 + 59
+
+  return events.filter(event => {
+    const dt = new Date(event.start_datetime)
+    const londonTime = dt.toLocaleString('en-GB', {
+      hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/London',
+    })
+    const [h, m] = londonTime.split(':').map(Number)
+    const eventMin = h * 60 + m
+    return eventMin >= fromMin && eventMin <= toMin
+  })
+}
+
 async function EventGrid({ searchParams }: PageProps) {
   const params = await searchParams
   const page = Math.max(1, parseInt(params.page ?? '1', 10))
-  const offset = (page - 1) * PAGE_SIZE
+  const hasTimeFilter = !!(params.time_from || params.time_to)
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const now = new Date().toISOString()
-  const farFuture = '2099-01-01T00:00:00Z'
+  const rpcBase = buildRpcBase(params)
 
-  let fromTime = now
-  let toTime = farFuture
-  if (params.date && params.date !== 'all') {
-    const range = getDateRange(params.date as DateFilter)
-    fromTime = range.from.toISOString()
-    toTime = range.to.toISOString()
+  let allEvents: Event[]
+  let count: number
+
+  if (hasTimeFilter) {
+    // Fetch a large batch and filter by time of day in JS
+    const { data } = await supabase.rpc('get_unique_events', {
+      ...rpcBase,
+      p_limit: 1000,
+      p_offset: 0,
+    })
+    const timeFiltered = filterByTimeOfDay((data ?? []) as Event[], params.time_from, params.time_to)
+    count = timeFiltered.length
+    const offset = (page - 1) * PAGE_SIZE
+    allEvents = timeFiltered.slice(offset, offset + PAGE_SIZE)
+  } else {
+    const offset = (page - 1) * PAGE_SIZE
+    const [{ data }, { data: countData }] = await Promise.all([
+      supabase.rpc('get_unique_events', { ...rpcBase, p_limit: PAGE_SIZE, p_offset: offset }),
+      supabase.rpc('count_unique_events', {
+        p_from_time: rpcBase.p_from_time,
+        p_to_time:   rpcBase.p_to_time,
+        p_category:  rpcBase.p_category,
+        p_is_free:   rpcBase.p_is_free,
+        p_search:    rpcBase.p_search,
+      }),
+    ])
+    allEvents = (data ?? []) as Event[]
+    count = (countData as number) ?? 0
   }
 
-  const rpcParams = {
-    p_from_time: fromTime,
-    p_to_time:   toTime,
-    p_category:  (params.category && params.category !== 'all') ? params.category : null,
-    p_is_free:   params.free === 'true' ? true : null,
-    p_search:    params.search || null,
-    p_limit:     PAGE_SIZE,
-    p_offset:    offset,
-  }
-
-  const [{ data: events }, { data: countData }] = await Promise.all([
-    supabase.rpc('get_unique_events', rpcParams),
-    supabase.rpc('count_unique_events', {
-      p_from_time: rpcParams.p_from_time,
-      p_to_time:   rpcParams.p_to_time,
-      p_category:  rpcParams.p_category,
-      p_is_free:   rpcParams.p_is_free,
-      p_search:    rpcParams.p_search,
-    }),
-  ])
-
-  const count = (countData as number) ?? 0
   const totalPages = Math.ceil(count / PAGE_SIZE)
 
   let savedIds = new Set<string>()
@@ -77,7 +139,7 @@ async function EventGrid({ searchParams }: PageProps) {
     userInterests = (interests ?? []).map(i => i.name.toLowerCase())
   }
 
-  const enriched: Event[] = ((events ?? []) as Event[]).map(ev => {
+  const enriched: Event[] = allEvents.map(ev => {
     const peopleMatch = ev.people?.filter((p: string) =>
       userInterests.some(i => p.toLowerCase().includes(i) || i.includes(p.toLowerCase()))
     )
@@ -115,6 +177,10 @@ async function EventGrid({ searchParams }: PageProps) {
     date: params.date,
     free: params.free,
     search: params.search,
+    view: params.view,
+    from: params.from,
+    time_from: params.time_from,
+    time_to: params.time_to,
   }
 
   return (
@@ -160,7 +226,26 @@ async function EventGrid({ searchParams }: PageProps) {
   )
 }
 
+async function EventMapWrapper({ searchParams }: PageProps) {
+  const params = await searchParams
+  const supabase = await createClient()
+  const rpcBase = buildRpcBase(params)
+
+  const { data: events } = await supabase.rpc('get_unique_events', {
+    ...rpcBase,
+    p_limit: 500,
+    p_offset: 0,
+  })
+
+  const filtered = filterByTimeOfDay((events ?? []) as Event[], params.time_from, params.time_to)
+
+  return <MapView events={filtered} totalCount={filtered.length} />
+}
+
 export default async function ExplorePage(props: PageProps) {
+  const params = await props.searchParams
+  const isMapView = params.view === 'map'
+
   return (
     <div className="min-h-screen bg-bg">
       <Nav />
@@ -179,14 +264,21 @@ export default async function ExplorePage(props: PageProps) {
 
           <Suspense
             fallback={
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {Array.from({ length: 9 }).map((_, i) => (
-                  <div key={i} className="card h-64 animate-pulse bg-border" />
-                ))}
-              </div>
+              isMapView ? (
+                <div className="w-full rounded-xl bg-border animate-pulse" style={{ height: '600px' }} />
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Array.from({ length: 9 }).map((_, i) => (
+                    <div key={i} className="card h-64 animate-pulse bg-border" />
+                  ))}
+                </div>
+              )
             }
           >
-            <EventGrid searchParams={props.searchParams} />
+            {isMapView
+              ? <EventMapWrapper searchParams={props.searchParams} />
+              : <EventGrid searchParams={props.searchParams} />
+            }
           </Suspense>
         </div>
       </main>

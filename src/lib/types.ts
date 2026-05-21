@@ -89,7 +89,7 @@ export interface SimilarProfile extends Profile {
   overlap_score: number
 }
 
-export type DateFilter = 'all' | 'today' | 'this_week' | 'this_weekend' | 'this_month'
+export type DateFilter = 'all' | 'today' | 'this_week' | 'this_weekend' | 'this_month' | 'custom'
 
 export interface EventFilters {
   category?: Category | 'all'

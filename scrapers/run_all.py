@@ -10,6 +10,24 @@ Options:
 import sys, os
 sys.path.insert(0, os.path.dirname(__file__))
 
+
+def _remove_non_uk_events():
+    """Delete any stored events whose coordinates fall outside the UK bounding box."""
+    from dotenv import load_dotenv
+    from supabase import create_client
+    load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env.local'))
+    sb = create_client(
+        os.environ['NEXT_PUBLIC_SUPABASE_URL'],
+        os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or os.environ['NEXT_PUBLIC_SUPABASE_ANON_KEY'],
+    )
+    # UK eastern boundary ~1.8°E; Frankfurt sits at ~8.7°E — safe filter
+    result = sb.table('events').delete().gt('lng', 1.8).execute()
+    removed = len(result.data or [])
+    if removed:
+        print(f'  Removed {removed} non-UK events (lng > 1.8)')
+    else:
+        print('  No non-UK events found')
+
 def main():
     seed_only = '--seed-only' in sys.argv
     no_browser = '--no-browser' in sys.argv
@@ -35,6 +53,12 @@ def main():
             seed_run()
         except Exception as e:
             print(f'  Seed clear error: {e}')
+
+    print('\n[cleanup] Removing any non-UK events...')
+    try:
+        _remove_non_uk_events()
+    except Exception as e:
+        print(f'  Cleanup error: {e}')
 
     # 2. Ticketmaster (concerts, shows, major events — free API key)
     print('\n[2/5] Ticketmaster Discovery API...')
@@ -76,19 +100,43 @@ def main():
     except Exception as e:
         print(f'  Songkick error: {e}')
 
-    # 7. Meetup
-    print('\n[7/8] Meetup.com...')
+    # 7. London Startup Guide (community Luma calendars + conferences)
+    print('\n[7/11] London Startup Guide community calendars + conferences...')
+    try:
+        from london_startup_guide_scraper import run as lsg_run
+        lsg_run()
+    except Exception as e:
+        print(f'  London Startup Guide error: {e}')
+
+    # 8. London Calling (curated London tech events aggregator)
+    print('\n[8/11] London Calling...')
+    try:
+        from london_calling_scraper import run as lc_run
+        lc_run()
+    except Exception as e:
+        print(f'  London Calling error: {e}')
+
+    # 9. Unicorn Mafia (London startup community events)
+    print('\n[9/11] Unicorn Mafia...')
+    try:
+        from unicorn_mafia_scraper import run as um_run
+        um_run()
+    except Exception as e:
+        print(f'  Unicorn Mafia error: {e}')
+
+    # 10. Meetup
+    print('\n[10/11] Meetup.com...')
     try:
         from meetup_scraper import run as meetup_run
         meetup_run()
     except Exception as e:
         print(f'  Meetup error: {e}')
 
-    # 8. Venue websites (requires Playwright/Chromium)
+    # 11. Venue websites (requires Playwright/Chromium)
     if no_browser:
-        print('\n[8/8] Venue websites skipped (--no-browser)')
+        print('\n[11/11] Venue websites skipped (--no-browser)')
     else:
-        print('\n[8/8] London venue websites...')
+        print('\n[11/11] London venue websites...')
         try:
             from london_venues_scraper import run as venue_run
             venue_run()

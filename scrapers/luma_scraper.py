@@ -154,6 +154,11 @@ def normalise(item: dict) -> dict | None:
         lat = coord.get('latitude')
         lng = coord.get('longitude')
 
+        # Reject events outside the UK bounding box (UK lng: -8.2 to 1.8; Frankfurt is at ~8.7)
+        if lat is not None and lng is not None:
+            if not (-8.2 <= lng <= 1.8 and 49.9 <= lat <= 58.7):
+                return None
+
         name = ev.get('name', '')
 
         # Try to get description from listing data first

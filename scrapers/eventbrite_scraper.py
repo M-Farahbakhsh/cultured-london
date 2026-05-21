@@ -135,6 +135,9 @@ def scrape_event_page(url: str, category: str) -> dict | None:
 
             location = item.get('location') or {}
             address = location.get('address') or {}
+            country = address.get('addressCountry', '')
+            if country and country.upper() not in ('GB', 'UK', 'UNITED KINGDOM'):
+                return None
             venue_name = location.get('name') or address.get('name')
             venue_addr = address.get('streetAddress') or address.get('addressLocality')
 
