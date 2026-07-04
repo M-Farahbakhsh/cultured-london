@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap');
 
 @layer base {
   body {
@@ -16,13 +16,14 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-accent text-white px-5 py-2.5 rounded-lg font-medium text-sm
-           hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-accent text-white px-5 py-2.5 rounded-full font-medium text-sm
+           hover:bg-accent-dark active:scale-[0.98] transition-all duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-secondary {
-    @apply bg-white text-ink border border-border px-5 py-2.5 rounded-lg font-medium text-sm
-           hover:bg-bg transition-colors;
+    @apply bg-white text-ink border border-border px-5 py-2.5 rounded-full font-medium text-sm
+           hover:border-ink/30 hover:bg-bg active:scale-[0.98] transition-all duration-150;
   }
 
   .btn-ghost {
@@ -30,21 +31,125 @@
   }
 
   .input {
-    @apply w-full border border-border rounded-lg px-3.5 py-2.5 text-sm bg-white
-           placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent/30
+    @apply w-full border border-border rounded-xl px-3.5 py-2.5 text-sm bg-white
+           placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent/25
            focus:border-accent transition-colors;
   }
 
   .card {
-    @apply bg-surface rounded-xl shadow-card border border-border overflow-hidden
-           transition-shadow hover:shadow-card-hover;
+    @apply bg-surface rounded-2xl shadow-card border border-border overflow-hidden
+           transition-all duration-200 ease-out hover:shadow-card-hover hover:-translate-y-0.5;
   }
 
   .page-container {
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Editorial section heading — serif, like a magazine standfirst */
+  .section-title {
+    @apply font-serif text-2xl text-ink tracking-tight;
+  }
+
+  /* Chip-style quick filter link */
+  .chip-link {
+    @apply text-sm px-4 py-2 rounded-full border border-border bg-surface text-ink
+           hover:border-accent hover:text-accent transition-colors whitespace-nowrap shrink-0;
   }
 }
 
 /* Scrollbar for filter chips */
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Designer details */
+::selection {
+  background: #c9f73a;
+  color: #1a1817;
+}
+html {
+  scroll-behavior: smooth;
+}
+
+/* News-wire ticker — duplicated track scrolls half its width for a seamless loop */
+.ticker-track {
+  animation: ticker-scroll 26s linear infinite;
+}
+.ticker:hover .ticker-track {
+  animation-play-state: paused;
+}
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* The 88 to Dalston — drives along the ticker, stops, drives off. Slight lean
+   under acceleration, flat when parked at the stop. */
+.bus-route {
+  animation: bus-route 16s ease-in-out infinite;
+}
+@keyframes bus-route {
+  0%   { left: 1.5%;                 opacity: 0; transform: rotate(0deg); }
+  7%   { opacity: 1;                 transform: rotate(-1.5deg); }
+  36%  { left: 44%;                  transform: rotate(1.5deg); }
+  40%  { left: 44%;                  transform: rotate(0deg); }
+  54%  { left: 44%;                  transform: rotate(0deg); }
+  58%  { opacity: 1;                 transform: rotate(-1.5deg); }
+  86%  { left: calc(92% - 58px);     opacity: 1; transform: rotate(0.5deg); }
+  93%  { left: calc(97% - 58px);     opacity: 0; transform: rotate(0deg); }
+  100% { left: calc(97% - 58px);     opacity: 0; transform: rotate(0deg); }
+}
+
+/* Staggered tile entrance for the onboarding taste wall */
+.tile-in {
+  animation: tile-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes tile-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Instrument Serif ships one weight — stop the browser faux-bolding it */
+.font-serif, .section-title {
+  font-weight: 400;
+}
+
+/* Aura background — the whole app sits on a slow colour field instead of flat cream.
+   Overrides the .bg-bg utility (declared after Tailwind's layers, so it wins). */
+.bg-bg {
+  background:
+    radial-gradient(52rem 52rem at 88% -8%, rgba(255, 46, 77, 0.13), transparent 62%),
+    radial-gradient(46rem 46rem at -12% 35%, rgba(201, 247, 58, 0.20), transparent 60%),
+    radial-gradient(56rem 56rem at 55% 115%, rgba(255, 170, 0, 0.13), transparent 62%),
+    #f7f5f0;
+  background-attachment: fixed;
+}
+
+/* Film grain over everything — the analogue texture that makes flat colour feel printed */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Skeleton shimmer for loading states */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: #ECE9E2;
+  border-radius: 1rem;
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent);
+  animation: skeleton-shimmer 1.4s infinite;
+}
+@keyframes skeleton-shimmer {
+  100% { transform: translateX(100%); }
+}

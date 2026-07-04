@@ -24,26 +24,36 @@ export default async function SavedPage() {
       <Nav />
       <main className="md:pl-56 pb-20 md:pb-8">
         <div className="page-container py-8">
-          <h1 className="text-2xl font-bold text-ink mb-1">Saved Events</h1>
-          <p className="text-muted text-sm mb-8">Your personal event directory</p>
+          <div className="mb-8">
+            <p className="text-accent text-xs font-semibold uppercase tracking-[0.15em]">saved</p>
+            <h1 className="font-serif text-4xl sm:text-5xl text-ink tracking-tight mt-2">
+              the yes pile<span className="text-accent">.</span>
+            </h1>
+            <p className="text-muted text-sm mt-2">everything you swiped right on or bookmarked — your taste, on record</p>
+          </div>
 
           {savedRows?.length === 0 ? (
             <div className="text-center py-20">
               <Bookmark size={40} className="text-border mx-auto mb-4" />
-              <p className="text-muted text-lg">Nothing saved yet</p>
-              <p className="text-muted text-sm mt-1 mb-6">Browse events and tap the bookmark to save them here</p>
-              <Link href="/explore" className="btn-primary inline-block">Explore events</Link>
+              <p className="font-serif text-3xl text-ink tracking-tight">the yes pile is empty</p>
+              <p className="text-muted text-sm mt-2 mb-6">go swipe, or smash a bookmark on anything that looks good</p>
+              <div className="flex items-center justify-center gap-3">
+                <Link href="/taste" className="btn-primary inline-block">start swiping →</Link>
+                <Link href="/explore" className="btn-secondary inline-block">browse everything</Link>
+              </div>
             </div>
           ) : (
             <div className="space-y-10">
               {upcoming.length > 0 && (
                 <section>
                   <h2 className="text-sm font-semibold text-muted uppercase tracking-wide mb-4">
-                    Upcoming ({upcoming.length})
+                    coming up ({upcoming.length})
                   </h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {upcoming.map(r => r.event && (
-                      <EventCard key={r.event.id} event={r.event} initialSaved />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {upcoming.map((r, i) => r.event && (
+                      <div key={r.event.id} className="tile-in" style={{ animationDelay: `${Math.min(i, 11) * 50}ms` }}>
+                        <EventCard event={r.event} initialSaved />
+                      </div>
                     ))}
                   </div>
                 </section>
@@ -52,9 +62,9 @@ export default async function SavedPage() {
               {past.length > 0 && (
                 <section>
                   <h2 className="text-sm font-semibold text-muted uppercase tracking-wide mb-4">
-                    Past ({past.length})
+                    missed it ({past.length})
                   </h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 opacity-60">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 opacity-60">
                     {past.map(r => r.event && (
                       <EventCard key={r.event.id} event={r.event} initialSaved />
                     ))}

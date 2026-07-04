@@ -42,29 +42,33 @@ export default function EventCard({ event, initialSaved = false }: Props) {
   return (
     <Link href={`/events/${event.id}`} className="card group block">
       {/* Image / gradient header */}
-      <div className="relative h-40 overflow-hidden">
+      <div className="relative h-44 overflow-hidden">
         {event.image_url && !imgFailed ? (
           <img
             src={event.image_url}
             alt={event.title}
             onError={() => setImgFailed(true)}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500 ease-out"
           />
         ) : (
-          <div className={`w-full h-full bg-gradient-to-br ${gradient} opacity-90`} />
+          <div className={`w-full h-full bg-gradient-to-br ${gradient} opacity-90 group-hover:scale-[1.04] transition-transform duration-500 ease-out`} />
         )}
+
+        {/* Soft bottom gradient so chips always read against photos */}
+        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/45 to-transparent pointer-events-none" />
 
         {/* Save button */}
         <button
           onClick={toggleSave}
           disabled={saving}
-          className="absolute top-3 right-3 w-8 h-8 bg-white/90 backdrop-blur rounded-full
-                     flex items-center justify-center shadow-sm hover:bg-white transition-colors"
+          className="absolute top-3 right-3 w-9 h-9 bg-white/90 backdrop-blur rounded-full
+                     flex items-center justify-center shadow-sm hover:bg-white hover:scale-105
+                     active:scale-95 transition-all duration-150"
           title={saved ? 'Remove from saved' : 'Save event'}
         >
           {saved
-            ? <BookmarkCheck size={15} className="text-accent" />
-            : <Bookmark size={15} className="text-ink" />}
+            ? <BookmarkCheck size={16} className="text-accent" />
+            : <Bookmark size={16} className="text-ink" />}
         </button>
 
         {/* Category chips */}
@@ -77,31 +81,33 @@ export default function EventCard({ event, initialSaved = false }: Props) {
 
       {/* Content */}
       <div className="p-4">
-        <h3 className="font-semibold text-ink text-sm leading-snug line-clamp-2 mb-2">
+        <h3 className="font-serif text-[17px] text-ink leading-snug line-clamp-2 mb-2.5 group-hover:text-accent transition-colors duration-150">
           {event.title}
         </h3>
 
         <div className="space-y-1 text-xs text-muted">
-          <p>{formatDate(event.start_datetime)} · {formatTime(event.start_datetime)}</p>
+          <p className="font-medium text-ink/80 uppercase tracking-wide text-[11px]">
+            {formatDate(event.start_datetime)} · {formatTime(event.start_datetime)}
+          </p>
           {event.venue_name && (
             <p className="truncate">{event.venue_name}{event.area ? ` · ${event.area}` : ''}</p>
           )}
-          <p className="font-medium text-ink/70">
+          <p className="font-semibold text-ink/70">
             {formatPrice(event.price_min, event.price_max, event.is_free)}
           </p>
         </div>
 
-        {/* Match reason */}
+        {/* Match reason — the personalization signal, styled as a quiet endorsement */}
         {event.match_reason && (
-          <div className="mt-3 flex items-start gap-1.5 text-xs text-accent bg-accent/5 rounded-lg px-2.5 py-2">
+          <div className="mt-3 flex items-start gap-1.5 text-xs text-accent bg-accent-soft rounded-lg px-2.5 py-2">
             <Sparkles size={12} className="mt-0.5 shrink-0" />
-            <span>{event.match_reason}</span>
+            <span className="font-medium">{event.match_reason}</span>
           </div>
         )}
 
         {/* Hover preview — slides in on desktop hover */}
         {(event.description || (event.people && event.people.length > 0) || (event.tags && event.tags.length > 0)) && (
-          <div className="overflow-hidden max-h-0 group-hover:max-h-32 transition-all duration-200 ease-out">
+          <div className="overflow-hidden max-h-0 group-hover:max-h-32 transition-all duration-300 ease-out">
             <div className="pt-2.5 mt-2.5 border-t border-border">
               {event.description ? (
                 <p className="text-xs text-muted line-clamp-3 leading-relaxed">{event.description}</p>

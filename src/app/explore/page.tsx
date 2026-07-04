@@ -5,8 +5,9 @@ import Nav from '@/components/Nav'
 import EventCard from '@/components/EventCard'
 import FilterBar from '@/components/FilterBar'
 import MapView from '@/components/MapView'
-import type { Event, Category, DateFilter } from '@/lib/types'
+import type { Event, DateFilter } from '@/lib/types'
 import { getDateRange } from '@/lib/utils'
+import { buildPreferenceProfile, scoreEvent, type PreferenceProfile } from '@/lib/recommendations'
 
 const PAGE_SIZE = 60
 
@@ -21,6 +22,7 @@ interface PageProps {
     from?: string
     time_from?: string
     time_to?: string
+    picked?: string
   }>
 }
 
@@ -64,6 +66,22 @@ function buildRpcBase(params: ResolvedParams) {
   }
 }
 
+// get_unique_events() matches on date-range overlap (start..end), so a months-long running
+// listing (e.g. an Eventbrite series from May to December) is correctly included as long as
+// it's still active — that's what we want ("running now" = featured). But its start_datetime
+// is still the original, months-old date, which reads as stale on a card. For any event that
+// already started, show today's date (keeping the original time of day) instead.
+function displayAsOngoing(events: Event[]): Event[] {
+  const now = new Date()
+  return events.map(ev => {
+    const start = new Date(ev.start_datetime)
+    if (start >= now) return ev
+    const today = new Date()
+    today.setUTCHours(start.getUTCHours(), start.getUTCMinutes(), start.getUTCSeconds(), 0)
+    return { ...ev, start_datetime: today.toISOString() }
+  })
+}
+
 function filterByTimeOfDay(events: Event[], timeFrom: string | undefined, timeTo: string | undefined): Event[] {
   if (!timeFrom && !timeTo) return events
 
@@ -89,26 +107,61 @@ async function EventGrid({ searchParams }: PageProps) {
   const params = await searchParams
   const page = Math.max(1, parseInt(params.page ?? '1', 10))
   const hasTimeFilter = !!(params.time_from || params.time_to)
+  const wantsPicked = params.picked === 'true'
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   const rpcBase = buildRpcBase(params)
 
-  let allEvents: Event[]
+  let savedIds = new Set<string>()
+  let profile: PreferenceProfile = { categoryScore: {}, termScore: new Map(), interestTerms: [], hasSignal: false }
+
+  if (user) {
+    const [{ data: saved }, builtProfile] = await Promise.all([
+      supabase.from('saved_events').select('event_id').eq('user_id', user.id),
+      buildPreferenceProfile(supabase, user.id),
+    ])
+    savedIds = new Set((saved ?? []).map(s => s.event_id))
+    profile = builtProfile
+  }
+
+  // "Picked for you" with nothing to learn from yet — point at the swipe deck.
+  if (wantsPicked && !profile.hasSignal) {
+    return (
+      <div className="text-center py-24 max-w-sm mx-auto">
+        <p className="font-serif text-3xl text-ink tracking-tight">we literally don&apos;t know you yet</p>
+        <p className="text-muted text-sm mt-2 leading-relaxed">
+          swipe a few events so this filter has something to work with. takes 30 seconds.
+        </p>
+        <Link href="/taste" className="btn-primary inline-block mt-6">start swiping →</Link>
+      </div>
+    )
+  }
+
+  const score = (evs: Event[]): Event[] =>
+    evs.map(ev => {
+      const { score: matchScore, reason } = scoreEvent(ev, profile)
+      return { ...ev, saved: savedIds.has(ev.id), match_score: matchScore, match_reason: reason ?? undefined }
+    })
+
+  let enriched: Event[]
   let count: number
 
-  if (hasTimeFilter) {
-    // Fetch a large batch and filter by time of day in JS
+  if (hasTimeFilter || wantsPicked) {
+    // JS-side filters need the full pool before paginating
     const { data } = await supabase.rpc('get_unique_events', {
       ...rpcBase,
       p_limit: 1000,
       p_offset: 0,
     })
-    const timeFiltered = filterByTimeOfDay((data ?? []) as Event[], params.time_from, params.time_to)
-    count = timeFiltered.length
+    let pool = score(displayAsOngoing((data ?? []) as Event[]))
+    pool = filterByTimeOfDay(pool, params.time_from, params.time_to)
+    if (wantsPicked) pool = pool.filter(ev => (ev.match_score ?? 0) > 0)
+    pool.sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0))
+    count = pool.length
     const offset = (page - 1) * PAGE_SIZE
-    allEvents = timeFiltered.slice(offset, offset + PAGE_SIZE)
+    enriched = pool.slice(offset, offset + PAGE_SIZE)
   } else {
     const offset = (page - 1) * PAGE_SIZE
     const [{ data }, { data: countData }] = await Promise.all([
@@ -121,53 +174,18 @@ async function EventGrid({ searchParams }: PageProps) {
         p_search:    rpcBase.p_search,
       }),
     ])
-    allEvents = (data ?? []) as Event[]
+    enriched = score(displayAsOngoing((data ?? []) as Event[]))
+    enriched.sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0))
     count = (countData as number) ?? 0
   }
 
   const totalPages = Math.ceil(count / PAGE_SIZE)
 
-  let savedIds = new Set<string>()
-  let userInterests: string[] = []
-
-  if (user) {
-    const [{ data: saved }, { data: interests }] = await Promise.all([
-      supabase.from('saved_events').select('event_id').eq('user_id', user.id),
-      supabase.from('interests').select('name').eq('user_id', user.id),
-    ])
-    savedIds = new Set((saved ?? []).map(s => s.event_id))
-    userInterests = (interests ?? []).map(i => i.name.toLowerCase())
-  }
-
-  const enriched: Event[] = allEvents.map(ev => {
-    const peopleMatch = ev.people?.filter((p: string) =>
-      userInterests.some(i => p.toLowerCase().includes(i) || i.includes(p.toLowerCase()))
-    )
-    const tagMatch = ev.tags?.filter((t: string) =>
-      userInterests.some(i => t.toLowerCase().includes(i) || i.includes(t.toLowerCase()))
-    )
-
-    let match_reason: string | undefined
-    if (peopleMatch?.length > 0) {
-      match_reason = `Matches your interest in ${peopleMatch.slice(0, 2).join(' & ')}`
-    } else if (tagMatch?.length > 0) {
-      match_reason = `Relevant to your interest in ${tagMatch.slice(0, 2).join(' & ')}`
-    }
-
-    return { ...ev, saved: savedIds.has(ev.id), match_reason }
-  })
-
-  enriched.sort((a, b) => {
-    if (a.match_reason && !b.match_reason) return -1
-    if (!a.match_reason && b.match_reason) return 1
-    return 0
-  })
-
   if (enriched.length === 0) {
     return (
-      <div className="text-center py-20">
-        <p className="text-muted text-lg">No events found</p>
-        <p className="text-muted text-sm mt-1">Try adjusting your filters</p>
+      <div className="text-center py-24">
+        <p className="font-serif text-3xl text-ink tracking-tight">it&apos;s giving... nothing</p>
+        <p className="text-muted text-sm mt-2">loosen a filter — london&apos;s got more than this, promise</p>
       </div>
     )
   }
@@ -181,17 +199,20 @@ async function EventGrid({ searchParams }: PageProps) {
     from: params.from,
     time_from: params.time_from,
     time_to: params.time_to,
+    picked: params.picked,
   }
 
   return (
     <>
-      <p className="text-muted text-sm mb-4">
+      <p className="text-muted text-xs font-medium uppercase tracking-wider mb-5">
         {count?.toLocaleString()} events · page {page} of {totalPages}
       </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {enriched.map(event => (
-          <EventCard key={event.id} event={event} initialSaved={event.saved} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {enriched.map((event, i) => (
+          <div key={event.id} className="tile-in" style={{ animationDelay: `${Math.min(i, 11) * 50}ms` }}>
+            <EventCard event={event} initialSaved={event.saved} />
+          </div>
         ))}
       </div>
 
@@ -230,6 +251,7 @@ async function EventMapWrapper({ searchParams }: PageProps) {
   const params = await searchParams
   const supabase = await createClient()
   const rpcBase = buildRpcBase(params)
+  const wantsPicked = params.picked === 'true'
 
   const { data: events } = await supabase.rpc('get_unique_events', {
     ...rpcBase,
@@ -237,7 +259,18 @@ async function EventMapWrapper({ searchParams }: PageProps) {
     p_offset: 0,
   })
 
-  const filtered = filterByTimeOfDay((events ?? []) as Event[], params.time_from, params.time_to)
+  const displayed = displayAsOngoing((events ?? []) as Event[])
+  let filtered = filterByTimeOfDay(displayed, params.time_from, params.time_to)
+
+  if (wantsPicked) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const profile = await buildPreferenceProfile(supabase, user.id)
+      if (profile.hasSignal) {
+        filtered = filtered.filter(ev => scoreEvent(ev, profile).score > 0)
+      }
+    }
+  }
 
   return <MapView events={filtered} totalCount={filtered.length} />
 }
@@ -251,9 +284,12 @@ export default async function ExplorePage(props: PageProps) {
       <Nav />
       <main className="md:pl-56 pb-20 md:pb-8">
         <div className="page-container py-8">
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-ink">Explore London</h1>
-            <p className="text-muted text-sm mt-1">Events matched to your taste</p>
+          <div className="mb-8">
+            <p className="text-accent text-xs font-semibold uppercase tracking-[0.15em]">explore london</p>
+            <h1 className="font-serif text-4xl sm:text-5xl text-ink tracking-tight mt-2">
+              pick your poison<span className="text-accent">.</span>
+            </h1>
+            <p className="text-muted text-sm mt-2">search it, map it, filter it — sorted by what you actually like</p>
           </div>
 
           <div className="mb-6">
@@ -265,11 +301,11 @@ export default async function ExplorePage(props: PageProps) {
           <Suspense
             fallback={
               isMapView ? (
-                <div className="w-full rounded-xl bg-border animate-pulse" style={{ height: '600px' }} />
+                <div className="skeleton w-full" style={{ height: '600px' }} />
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {Array.from({ length: 9 }).map((_, i) => (
-                    <div key={i} className="card h-64 animate-pulse bg-border" />
+                    <div key={i} className="skeleton h-72" />
                   ))}
                 </div>
               )

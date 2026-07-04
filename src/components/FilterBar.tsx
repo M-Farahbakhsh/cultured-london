@@ -1,7 +1,7 @@
 'use client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback } from 'react'
-import { Search, SlidersHorizontal, LayoutGrid, Map } from 'lucide-react'
+import { Search, SlidersHorizontal, LayoutGrid, Map, Sparkles } from 'lucide-react'
 import type { Category, DateFilter } from '@/lib/types'
 import { CATEGORY_META } from '@/lib/utils'
 import DateTimePicker from './DateTimePicker'
@@ -39,6 +39,7 @@ export default function FilterBar() {
   const free = searchParams.get('free') === 'true'
   const search = searchParams.get('search') ?? ''
   const view = searchParams.get('view') ?? 'grid'
+  const picked = searchParams.get('picked') === 'true'
 
   const updateParams = useCallback((updates: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -107,6 +108,18 @@ export default function FilterBar() {
 
       {/* Category chips */}
       <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+        {/* Picked for you — the personalization filter, always first */}
+        <button
+          onClick={() => updateParams({ picked: picked ? null : 'true' })}
+          className={`shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors
+            ${picked
+              ? 'bg-accent text-white'
+              : 'bg-white border border-accent/40 text-accent hover:bg-accent-soft'
+            }`}
+        >
+          <Sparkles size={13} />
+          Picked for you
+        </button>
         {CATEGORIES.map(({ value, label }) => {
           const active = category === value
           const meta = value !== 'all' ? CATEGORY_META[value as Category] : null

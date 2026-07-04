@@ -6,20 +6,24 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
-        serif: ['Georgia', 'serif'],
+        serif: ['"Instrument Serif"', 'Georgia', 'Times New Roman', 'serif'],
       },
       colors: {
-        bg: '#F8F7F4',
+        bg: '#F7F5F0',
         surface: '#FFFFFF',
-        border: '#E5E3DC',
-        ink: '#1C1C1A',
-        muted: '#78716C',
-        accent: '#2563EB',
-        'accent-dark': '#1D4ED8',
+        border: '#E8E4DB',
+        ink: '#1A1817',
+        muted: '#6F6A63',
+        // The real thing: TfL roundel red (Pantone 485 territory), not pink
+        accent: '#E32017',
+        'accent-dark': '#B81A12',
+        'accent-soft': '#FBE9E7',
+        // Acid lime — the pop color. Only ever on dark surfaces, in small doses.
+        pop: '#C9F73A',
       },
       boxShadow: {
-        card: '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
-        'card-hover': '0 4px 12px rgba(0,0,0,0.10), 0 2px 4px rgba(0,0,0,0.06)',
+        card: '0 1px 2px rgba(26,24,23,0.05), 0 1px 1px rgba(26,24,23,0.03)',
+        'card-hover': '0 12px 24px -6px rgba(26,24,23,0.14), 0 4px 8px -2px rgba(26,24,23,0.08)',
       },
     },
   },

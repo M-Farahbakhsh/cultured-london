@@ -1,33 +1,43 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Music, BookOpen, Lightbulb, Calendar, ArrowRight, Check } from 'lucide-react'
+import { ArrowRight, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import InterestPicker from '@/components/InterestPicker'
-import type { Interest, InterestType } from '@/lib/types'
+import type { Interest } from '@/lib/types'
 
-const EVENT_TYPES = [
-  { value: 'music', label: 'Live Music & Gigs' },
-  { value: 'art', label: 'Art & Exhibitions' },
-  { value: 'talk', label: 'Talks & Lectures' },
-  { value: 'film', label: 'Film Screenings' },
-  { value: 'tech', label: 'Tech & AI Events' },
-  { value: 'literature', label: 'Books & Literature' },
-  { value: 'theatre', label: 'Theatre & Performance' },
-  { value: 'comedy', label: 'Comedy' },
+// One screen, zero required typing. Tapping tiles IS building your feed —
+// the Pinterest onboarding pattern. Genre tiles map straight onto event
+// categories; scene tiles become topic interests for tag/people matching.
+const TASTE_TILES: { emoji: string; label: string; type: 'genre' | 'topic'; name: string; gradient: string }[] = [
+  { emoji: '🎸', label: 'Live music',        type: 'genre', name: 'music',       gradient: 'from-purple-500 to-purple-700' },
+  { emoji: '🤖', label: 'Tech & AI',         type: 'genre', name: 'tech',        gradient: 'from-orange-500 to-orange-700' },
+  { emoji: '🎨', label: 'Art & exhibitions', type: 'genre', name: 'art',         gradient: 'from-rose-500 to-rose-700' },
+  { emoji: '😂', label: 'Comedy',            type: 'genre', name: 'comedy',      gradient: 'from-amber-500 to-amber-600' },
+  { emoji: '🎤', label: 'Talks & ideas',     type: 'genre', name: 'talk',        gradient: 'from-blue-500 to-blue-700' },
+  { emoji: '🎬', label: 'Film',              type: 'genre', name: 'film',        gradient: 'from-teal-500 to-teal-700' },
+  { emoji: '🎭', label: 'Theatre',           type: 'genre', name: 'theatre',     gradient: 'from-pink-500 to-pink-700' },
+  { emoji: '📚', label: 'Books & writing',   type: 'genre', name: 'literature',  gradient: 'from-green-600 to-green-800' },
+  { emoji: '🎷', label: 'Jazz nights',       type: 'topic', name: 'jazz',        gradient: 'from-indigo-500 to-indigo-700' },
+  { emoji: '🪩', label: 'Club nights',       type: 'topic', name: 'club',        gradient: 'from-fuchsia-500 to-fuchsia-700' },
+  { emoji: '🚀', label: 'Startups',          type: 'topic', name: 'startup',     gradient: 'from-slate-600 to-slate-800' },
+  { emoji: '🧠', label: 'AI & science',      type: 'topic', name: 'ai',          gradient: 'from-cyan-600 to-cyan-800' },
+  { emoji: '🍜', label: 'Food & markets',    type: 'topic', name: 'food',        gradient: 'from-red-500 to-red-700' },
+  { emoji: '📷', label: 'Photography',       type: 'topic', name: 'photography', gradient: 'from-stone-500 to-stone-700' },
+  { emoji: '✒️', label: 'Poetry & spoken word', type: 'topic', name: 'poetry',   gradient: 'from-violet-500 to-violet-700' },
+  { emoji: '🎻', label: 'Classical',         type: 'topic', name: 'classical',   gradient: 'from-yellow-600 to-yellow-800' },
+  { emoji: '💃', label: 'Dance',             type: 'topic', name: 'dance',       gradient: 'from-orange-400 to-rose-500' },
+  { emoji: '🌱', label: 'Wellness & outdoors', type: 'topic', name: 'wellness',  gradient: 'from-emerald-500 to-emerald-700' },
+  { emoji: '🏛️', label: 'History & heritage', type: 'topic', name: 'history',   gradient: 'from-amber-700 to-amber-900' },
+  { emoji: '🎮', label: 'Gaming',            type: 'topic', name: 'gaming',      gradient: 'from-blue-600 to-indigo-800' },
 ]
 
-const STEPS = [
-  { id: 1, title: 'Music', subtitle: 'Which artists and genres do you love?', icon: Music },
-  { id: 2, title: 'Books & Authors', subtitle: 'Who do you read?', icon: BookOpen },
-  { id: 3, title: 'Ideas & People', subtitle: 'Thinkers, topics, and subjects you follow', icon: Lightbulb },
-  { id: 4, title: 'Event types', subtitle: 'What kinds of events do you want to discover?', icon: Calendar },
-]
+const MIN_PICKS = 3
 
 export default function OnboardingPage() {
-  const [step, setStep] = useState(1)
-  const [interests, setInterests] = useState<Interest[]>([])
-  const [selectedTypes, setSelectedTypes] = useState<string[]>([])
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [specific, setSpecific] = useState<Interest[]>([])
+  const [saving, setSaving] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -38,148 +48,137 @@ export default function OnboardingPage() {
     })
   }, [])
 
-  const forStep: Record<number, InterestType> = { 1: 'artist', 2: 'author', 3: 'topic' }
-  const stepInterests = interests.filter(i => i.type === forStep[step])
+  const toggle = (name: string) => {
+    setPicked(prev => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
 
-  const addInterest = async (name: string, metadata?: Record<string, unknown>) => {
+  const addSpecific = async (name: string, metadata?: Record<string, unknown>) => {
     if (!userId) return
-    const type = forStep[step]
-    if (!type) return
     const { data, error } = await supabase
       .from('interests')
-      .insert({ user_id: userId, type, name, metadata: metadata ?? {} })
+      .insert({ user_id: userId, type: 'artist', name, metadata: metadata ?? {} })
       .select()
       .single()
-    if (!error && data) setInterests(prev => [...prev, data])
+    if (!error && data) setSpecific(prev => [...prev, data])
   }
 
-  const removeInterest = async (id: string) => {
+  const removeSpecific = async (id: string) => {
     await supabase.from('interests').delete().eq('id', id)
-    setInterests(prev => prev.filter(i => i.id !== id))
-  }
-
-  const toggleType = (val: string) => {
-    setSelectedTypes(prev => prev.includes(val) ? prev.filter(t => t !== val) : [...prev, val])
+    setSpecific(prev => prev.filter(i => i.id !== id))
   }
 
   const finish = async () => {
-    if (!userId) return
-    // Save event type preferences as genre interests
-    for (const t of selectedTypes) {
-      await supabase.from('interests')
-        .upsert({ user_id: userId, type: 'genre', name: t, metadata: {} }, { onConflict: 'user_id,type,name' })
-    }
-    router.push('/home')
+    if (!userId || picked.size < MIN_PICKS) return
+    setSaving(true)
+    const rows = TASTE_TILES
+      .filter(t => picked.has(t.name))
+      .map(t => ({ user_id: userId, type: t.type, name: t.name, metadata: {} }))
+    await supabase.from('interests').upsert(rows, { onConflict: 'user_id,type,name' })
+    router.push('/taste')
+    router.refresh()
   }
 
-  const StepIcon = STEPS[step - 1].icon
-  const progress = ((step - 1) / STEPS.length) * 100
+  const count = picked.size
+  const ready = count >= MIN_PICKS
 
   return (
-    <div className="min-h-screen bg-bg flex items-center justify-center p-6">
-      <div className="w-full max-w-lg">
-        {/* Progress */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-muted">Step {step} of {STEPS.length}</span>
-            <span className="text-xs text-muted">{Math.round(progress)}% complete</span>
-          </div>
-          <div className="h-1.5 bg-border rounded-full overflow-hidden">
-            <div
-              className="h-full bg-accent rounded-full transition-all duration-500"
-              style={{ width: `${(step / STEPS.length) * 100}%` }}
-            />
-          </div>
+    <div className="min-h-screen bg-bg">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-10 sm:pt-16 pb-40">
+
+        {/* Masthead */}
+        <div className="mb-10 text-center">
+          <p className="text-accent text-xs font-semibold uppercase tracking-[0.15em]">Cultured LDN</p>
+          <h1 className="font-serif text-4xl sm:text-5xl text-ink tracking-tight mt-3">
+            What gets you<br className="sm:hidden" /> out of the house?
+          </h1>
+          <p className="text-muted mt-3 max-w-md mx-auto">
+            Tap anything that sounds like a good night. Every tap sharpens your feed.
+          </p>
         </div>
 
-        <div className="card p-8">
-          {/* Step header */}
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center">
-              <StepIcon size={20} className="text-accent" />
+        {/* The taste wall */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          {TASTE_TILES.map((tile, i) => {
+            const selected = picked.has(tile.name)
+            return (
+              <button
+                key={tile.name}
+                onClick={() => toggle(tile.name)}
+                style={{ animationDelay: `${i * 35}ms` }}
+                className={`tile-in relative rounded-2xl p-4 h-28 sm:h-32 text-left overflow-hidden
+                            bg-gradient-to-br ${tile.gradient} transition-all duration-200 ease-out
+                            ${selected
+                              ? 'ring-[3px] ring-accent ring-offset-2 ring-offset-bg scale-[0.97]'
+                              : 'hover:scale-[1.03] hover:shadow-card-hover opacity-90 hover:opacity-100'}`}
+              >
+                <span className="text-2xl sm:text-3xl block">{tile.emoji}</span>
+                <span className="absolute bottom-3 left-4 right-3 text-white font-semibold text-sm leading-tight drop-shadow">
+                  {tile.label}
+                </span>
+                {selected && (
+                  <span className="absolute top-2.5 right-2.5 w-6 h-6 bg-white rounded-full flex items-center justify-center shadow">
+                    <Check size={14} className="text-accent" strokeWidth={3} />
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Optional: someone specific */}
+        <div className="mt-12">
+          <p className="font-serif text-xl text-ink tracking-tight mb-1">Anyone specific?</p>
+          <p className="text-sm text-muted mb-4">
+            Optional — name an artist, author or thinker you&apos;d cross town for.
+          </p>
+          <InterestPicker
+            type="artist"
+            label=""
+            placeholder="Radiohead, Zadie Smith, Brian Eno..."
+            interests={specific}
+            onAdd={addSpecific}
+            onRemove={removeSpecific}
+          />
+        </div>
+      </div>
+
+      {/* Sticky action bar — progress you can feel */}
+      <div className="fixed bottom-0 left-0 right-0 bg-surface/95 backdrop-blur border-t border-border">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-1.5">
+              {Array.from({ length: MIN_PICKS }).map((_, i) => (
+                <span
+                  key={i}
+                  className={`w-2.5 h-2.5 rounded-full transition-colors duration-300 ${i < count ? 'bg-accent' : 'bg-border'}`}
+                />
+              ))}
+              {count > MIN_PICKS && (
+                <span className="text-xs text-accent font-semibold ml-1">+{count - MIN_PICKS}</span>
+              )}
             </div>
-            <div>
-              <h2 className="text-xl font-bold text-ink">{STEPS[step - 1].title}</h2>
-              <p className="text-sm text-muted">{STEPS[step - 1].subtitle}</p>
-            </div>
+            <p className="text-xs text-muted mt-1.5">
+              {ready
+                ? `${count} picked — your feed is ready`
+                : `Pick ${MIN_PICKS - count} more to build your feed`}
+            </p>
           </div>
-
-          <div className="mt-6 min-h-[200px]">
-            {step === 1 && (
-              <InterestPicker
-                type="artist"
-                label="Artists & musicians"
-                placeholder="Search: Radiohead, Brian Eno, Floating Points..."
-                interests={stepInterests}
-                onAdd={addInterest}
-                onRemove={removeInterest}
-              />
-            )}
-            {step === 2 && (
-              <InterestPicker
-                type="author"
-                label="Authors & writers"
-                placeholder="Search: Zadie Smith, Ted Chiang, Robin Wall Kimmerer..."
-                interests={stepInterests}
-                onAdd={addInterest}
-                onRemove={removeInterest}
-              />
-            )}
-            {step === 3 && (
-              <InterestPicker
-                type="topic"
-                label="Topics, thinkers & ideas"
-                placeholder="Type anything: AI safety, consciousness, dark matter..."
-                interests={stepInterests}
-                onAdd={addInterest}
-                onRemove={removeInterest}
-              />
-            )}
-            {step === 4 && (
-              <div>
-                <p className="text-sm text-muted mb-4">Select all that interest you</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {EVENT_TYPES.map(({ value, label }) => {
-                    const selected = selectedTypes.includes(value)
-                    return (
-                      <button
-                        key={value}
-                        onClick={() => toggleType(value)}
-                        className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border text-sm font-medium transition-all text-left
-                          ${selected
-                            ? 'border-accent bg-accent/5 text-accent'
-                            : 'border-border text-muted hover:border-ink/30 hover:text-ink'}`}
-                      >
-                        {selected && <Check size={14} className="shrink-0" />}
-                        {!selected && <span className="w-3.5 h-3.5 border border-border rounded shrink-0" />}
-                        {label}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Navigation */}
-          <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
-            {step > 1 ? (
-              <button onClick={() => setStep(s => s - 1)} className="btn-ghost">Back</button>
-            ) : (
-              <button onClick={() => router.push('/home')} className="btn-ghost text-muted">
-                Skip all
-              </button>
-            )}
-
-            {step < STEPS.length ? (
-              <button onClick={() => setStep(s => s + 1)} className="btn-primary flex items-center gap-2">
-                Next <ArrowRight size={15} />
-              </button>
-            ) : (
-              <button onClick={finish} className="btn-primary flex items-center gap-2">
-                Start exploring <ArrowRight size={15} />
-              </button>
-            )}
+          <div className="flex items-center gap-3 shrink-0">
+            <button onClick={() => router.push('/home')} className="btn-ghost text-sm">
+              Skip
+            </button>
+            <button
+              onClick={finish}
+              disabled={!ready || saving}
+              className="btn-primary flex items-center gap-2"
+            >
+              {saving ? 'Building...' : 'Build my feed'} <ArrowRight size={15} />
+            </button>
           </div>
         </div>
       </div>
