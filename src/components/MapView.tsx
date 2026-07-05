@@ -44,6 +44,7 @@ interface Props {
 export default function MapView({ events, totalCount }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
+  const markersLayerRef = useRef<any>(null)
 
   const mappable = events.filter(e => e.lat != null && e.lng != null)
   const unmappable = totalCount - mappable.length
@@ -54,27 +55,39 @@ export default function MapView({ events, totalCount }: Props) {
     mappable.some(e => (e.categories?.[0] ?? 'other') === cat)
   )
 
+  // Map + tiles + controls are created once. Markers are redrawn on every
+  // run of this effect — which fires whenever `events` changes, i.e. every
+  // filter change — instead of only ever reflecting whatever was on screen
+  // at first mount (the old bug: switching filters while already on the
+  // map view silently did nothing).
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return
+    let cancelled = false
 
-    // Dynamically import Leaflet to avoid SSR issues
     import('leaflet').then(L => {
+      if (cancelled || !containerRef.current) return
       import('leaflet/dist/leaflet.css' as any)
 
-      const map = L.map(containerRef.current!, {
-        center: CENTRAL_LONDON,
-        zoom: INITIAL_ZOOM,
-        scrollWheelZoom: true,
-        zoomControl: false,
-      })
+      if (!mapRef.current) {
+        const map = L.map(containerRef.current, {
+          center: CENTRAL_LONDON,
+          zoom: INITIAL_ZOOM,
+          scrollWheelZoom: true,
+          zoomControl: false,
+        })
 
-      L.control.zoom({ position: 'bottomright' }).addTo(map)
+        L.control.zoom({ position: 'bottomright' }).addTo(map)
 
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: 'abcd',
-        maxZoom: 20,
-      }).addTo(map)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+          attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+          subdomains: 'abcd',
+          maxZoom: 20,
+        }).addTo(map)
+
+        markersLayerRef.current = L.layerGroup().addTo(map)
+        mapRef.current = map
+      }
+
+      markersLayerRef.current.clearLayers()
 
       mappable.forEach(event => {
         const lat = event.lat!
@@ -104,19 +117,22 @@ export default function MapView({ events, totalCount }: Props) {
           </div>
         `)
 
-        L.marker([lat, lng], { icon }).addTo(map).bindPopup(popup)
+        L.marker([lat, lng], { icon }).addTo(markersLayerRef.current).bindPopup(popup)
       })
-
-      mapRef.current = map
     })
 
+    return () => { cancelled = true }
+  }, [events])
+
+  // Map instance itself only ever gets torn down on actual unmount.
+  useEffect(() => {
     return () => {
       if (mapRef.current) {
         mapRef.current.remove()
         mapRef.current = null
       }
     }
-  }, []) // only run once on mount
+  }, [])
 
   return (
     <div>

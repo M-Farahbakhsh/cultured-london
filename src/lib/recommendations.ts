@@ -65,12 +65,16 @@ export async function buildPreferenceProfile(
   for (const i of interests ?? []) {
     profile.hasSignal = true
     const lower = i.name.toLowerCase()
-    profile.interestTerms.push(lower)
     // Genre picks from onboarding map directly onto event categories, so they
-    // should boost category scoring — not just term matching against tags/people.
+    // boost category scoring instead of going into free-text term matching.
+    // They must NOT also join interestTerms: short genre words like "art",
+    // "tech", or "talk" would then substring-match all kinds of unrelated
+    // tags/people (biotech, TalkTalk, Bart...) via matchesInterest below.
     if (i.type === 'genre' && CATEGORY_NAMES.has(lower)) {
       profile.categoryScore[lower as Category] =
         (profile.categoryScore[lower as Category] ?? 0) + WEIGHTS.interest
+    } else {
+      profile.interestTerms.push(lower)
     }
   }
 
@@ -100,9 +104,22 @@ export async function buildPreferenceProfile(
   return profile
 }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// Raw `.includes()` here used to mean a short topic interest like "ai" would
+// match "chair", "detail", "maintain", "captain" — any tag/person containing
+// those letters in sequence, anywhere. Word-boundary matching means "ai"
+// only matches when it (or the candidate) appears as a whole word/phrase.
 function matchesInterest(term: string, interestTerms: string[]): string | null {
-  const lower = term.toLowerCase()
-  return interestTerms.find(i => lower.includes(i) || i.includes(lower)) ?? null
+  const lower = term.toLowerCase().trim()
+  return interestTerms.find(i => {
+    if (lower === i) return true
+    if (new RegExp(`\\b${escapeRegExp(i)}\\b`).test(lower)) return true
+    if (new RegExp(`\\b${escapeRegExp(lower)}\\b`).test(i)) return true
+    return false
+  }) ?? null
 }
 
 // Naming the exact tag/person that drove a match ("Because you like Jai Khurmi")
