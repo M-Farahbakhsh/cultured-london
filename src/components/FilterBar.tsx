@@ -24,7 +24,7 @@ const DATE_PRESETS: Array<{ value: DateFilter; label: string }> = [
   { value: 'all', label: 'Any time' },
   { value: 'today', label: 'Today' },
   { value: 'this_week', label: 'This week' },
-  { value: 'this_weekend', label: 'Weekend' },
+  { value: 'this_weekend', label: 'This Weekend' },
   { value: 'this_month', label: 'This month' },
 ]
 
