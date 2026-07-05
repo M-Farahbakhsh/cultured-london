@@ -91,6 +91,32 @@ function matchesInterest(term: string, interestTerms: string[]): string | null {
   return interestTerms.find(i => lower.includes(i) || i.includes(lower)) ?? null
 }
 
+// Naming the exact tag/person that drove a match ("Because you like Jai Khurmi")
+// reads as uncannily specific when it's really just a loose substring hit against
+// scraped event metadata — nobody remembers "liking" a name they never chose. These
+// stay generic and vibey instead, keeping the personalization feel without the
+// false precision. Picked deterministically per event so a reload doesn't flicker
+// between phrasings for the same card.
+const CATEGORY_VIBE_REASONS = [
+  (cat: string) => `${cat} · matches your taste`,
+  (cat: string) => `${cat} · picked for your feed`,
+  (cat: string) => `${cat} · your kind of night`,
+  (cat: string) => `${cat} · no black box, just taste`,
+]
+
+const GENERIC_VIBE_REASONS = [
+  'matches your taste, no cap',
+  'picked just for you',
+  'your feed said yes to this one',
+  'quietly your vibe',
+]
+
+function pickReason<T>(pool: T[], seed: string): T {
+  let hash = 0
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0
+  return pool[Math.abs(hash) % pool.length]
+}
+
 export function scoreEvent(event: Event, profile: PreferenceProfile): { score: number; reason: string | null } {
   let score = 0
   let bestTerm: { term: string; weight: number } | null = null
@@ -111,11 +137,11 @@ export function scoreEvent(event: Event, profile: PreferenceProfile): { score: n
   }
 
   let reason: string | null = null
-  if (bestTerm) {
-    reason = `Because you like ${bestTerm.term}`
-  } else {
-    const topCategory = (event.categories ?? []).find(c => (profile.categoryScore[c] ?? 0) > 0)
-    if (topCategory) reason = `Because you've enjoyed ${topCategory} events`
+  const topCategory = (event.categories ?? []).find(c => (profile.categoryScore[c] ?? 0) > 0)
+  if (topCategory && topCategory !== 'other') {
+    reason = pickReason(CATEGORY_VIBE_REASONS, event.id)(topCategory)
+  } else if (score > 0) {
+    reason = pickReason(GENERIC_VIBE_REASONS, event.id)
   }
 
   return { score, reason }
