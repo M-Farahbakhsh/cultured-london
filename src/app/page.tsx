@@ -40,6 +40,10 @@ export default async function LandingPage() {
         </span>
       </div>
 
+      <div className="w-full max-w-md">
+        <LiveTicker items={tickerItems} />
+      </div>
+
       {/* Punchy pitch */}
       <div className="w-full max-w-md text-center mb-4">
         <p className="text-accent text-xs font-semibold uppercase tracking-[0.15em] mb-3">
@@ -52,10 +56,6 @@ export default async function LandingPage() {
           gigs, raves, talks, galleries — matched to your taste, not vibes-based guessing.
           every pick&apos;s got receipts.
         </p>
-      </div>
-
-      <div className="w-full max-w-md">
-        <LiveTicker items={tickerItems} />
       </div>
 
       <AuthForm />
