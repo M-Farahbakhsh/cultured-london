@@ -53,6 +53,11 @@ GENRE_OVERRIDES = {
     'technology': 'tech',
     'conference': 'talk',
     'lecture': 'talk',
+    # Ticketmaster buckets museums/attractions (Twist Museum, Madame Tussauds,
+    # London Dungeon, London Eye, Sea Life, theme parks, etc.) under the
+    # generic "Family" genre with subGenre "Other" — previously unmatched by
+    # any override, so segment fell through to Miscellaneous -> 'other'.
+    'family': 'exhibition',
 }
 
 
