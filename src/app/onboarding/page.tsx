@@ -79,7 +79,7 @@ export default function OnboardingPage() {
       .filter(t => picked.has(t.name))
       .map(t => ({ user_id: userId, type: t.type, name: t.name, metadata: {} }))
     await supabase.from('interests').upsert(rows, { onConflict: 'user_id,type,name' })
-    router.push('/taste')
+    router.push('/home?justOnboarded=1')
     router.refresh()
   }
 

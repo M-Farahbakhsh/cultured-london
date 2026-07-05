@@ -102,6 +102,12 @@ const CATEGORY_VIBE_REASONS = [
   (cat: string) => `${cat} · picked for your feed`,
   (cat: string) => `${cat} · your kind of night`,
   (cat: string) => `${cat} · no black box, just taste`,
+  (cat: string) => `${cat} · your algorithm said yes`,
+  (cat: string) => `${cat} · main character energy`,
+  (cat: string) => `${cat} · low-key made for you`,
+  (cat: string) => `${cat} · this one's giving you`,
+  (cat: string) => `${cat} · basically your love language`,
+  (cat: string) => `${cat} · you'd tap yes on this`,
 ]
 
 const GENERIC_VIBE_REASONS = [
@@ -109,6 +115,12 @@ const GENERIC_VIBE_REASONS = [
   'picked just for you',
   'your feed said yes to this one',
   'quietly your vibe',
+  'main character energy, honestly',
+  'zero scroll, straight to yes',
+  "this one's kind of a callback",
+  'basically tailor-made',
+  'your taste, no notes',
+  'low-key perfect for you',
 ]
 
 function pickReason<T>(pool: T[], seed: string): T {

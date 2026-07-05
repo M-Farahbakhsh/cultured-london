@@ -4,13 +4,19 @@ import { ArrowRight, Moon, CalendarDays, Ticket } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import Nav from '@/components/Nav'
 import EventCard from '@/components/EventCard'
+import OnboardingNudge from '@/components/OnboardingNudge'
 import type { Event } from '@/lib/types'
 import { formatDate } from '@/lib/utils'
 import { buildPreferenceProfile, rankEventsByPreference } from '@/lib/recommendations'
 
 export const dynamic = 'force-dynamic'
 
-export default async function HomePage() {
+interface PageProps {
+  searchParams: Promise<{ justOnboarded?: string }>
+}
+
+export default async function HomePage({ searchParams }: PageProps) {
+  const params = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/')
@@ -103,6 +109,8 @@ export default async function HomePage() {
       <Nav />
       <main className="relative md:pl-56 pb-24 md:pb-8">
         <div className="page-container py-8">
+
+          {params.justOnboarded && <OnboardingNudge />}
 
           {/* Masthead */}
           <div className="mb-6">
