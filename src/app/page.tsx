@@ -20,9 +20,9 @@ export default async function LandingPage() {
   const tickerItems = [
     `${(liveCount as number ?? 0).toLocaleString()} events on. zero excuses`,
     formatDate(new Date().toISOString()).toLowerCase(),
-    'swipe right on your next obsession',
+    'no account needed to just look around',
     'gigs · raves · galleries · comedy · everything',
-    'no account needed to look — sign up to get picked for you',
+    'sign up once, get picked for forever',
   ]
 
   return (
