@@ -1,8 +1,12 @@
-name: Weekly Event Scraper
+name: Daily Event Scraper
 
 on:
   schedule:
-    - cron: '0 7 * * 1'  # Every Monday at 7am UTC (8am BST)
+    # 2am UTC = 3am BST (UK summer time, currently in effect). GitHub Actions
+    # cron always runs in UTC and can't auto-adjust for GMT/BST, so once the
+    # UK falls back to GMT in late October this will fire at 2am UK time
+    # instead of 3am — bump to '0 3 * * *' then if 3am UK time still matters.
+    - cron: '0 2 * * *'
   workflow_dispatch:       # Allows you to trigger it manually from GitHub
 
 jobs:
