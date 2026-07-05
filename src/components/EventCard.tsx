@@ -40,9 +40,16 @@ export default function EventCard({ event, initialSaved = false }: Props) {
   }
 
   return (
-    <Link href={`/events/${event.id}`} className="card group block">
+    // A <button> can't validly nest inside the <a> that Link renders — browsers
+    // repair that invalid HTML during parsing, which no longer matches what React
+    // hydrates against. The full-card Link now sits as an absolutely-positioned
+    // sibling instead, with everything else pointer-events-none so clicks fall
+    // through to it, except the save button which stays independently clickable.
+    <div className="card group relative">
+      <Link href={`/events/${event.id}`} className="absolute inset-0 z-0" aria-label={event.title} />
+
       {/* Image / gradient header */}
-      <div className="relative h-44 overflow-hidden">
+      <div className="relative h-44 overflow-hidden pointer-events-none">
         {event.image_url && !imgFailed ? (
           <img
             src={event.image_url}
@@ -55,21 +62,7 @@ export default function EventCard({ event, initialSaved = false }: Props) {
         )}
 
         {/* Soft bottom gradient so chips always read against photos */}
-        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/45 to-transparent pointer-events-none" />
-
-        {/* Save button */}
-        <button
-          onClick={toggleSave}
-          disabled={saving}
-          className="absolute top-3 right-3 w-9 h-9 bg-white/90 backdrop-blur rounded-full
-                     flex items-center justify-center shadow-sm hover:bg-white hover:scale-105
-                     active:scale-95 transition-all duration-150"
-          title={saved ? 'Remove from saved' : 'Save event'}
-        >
-          {saved
-            ? <BookmarkCheck size={16} className="text-accent" />
-            : <Bookmark size={16} className="text-ink" />}
-        </button>
+        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/45 to-transparent" />
 
         {/* Category chips */}
         <div className="absolute bottom-3 left-3 flex gap-1.5 flex-wrap">
@@ -79,8 +72,22 @@ export default function EventCard({ event, initialSaved = false }: Props) {
         </div>
       </div>
 
+      {/* Save button — sibling of the Link, not nested inside it */}
+      <button
+        onClick={toggleSave}
+        disabled={saving}
+        className="absolute top-3 right-3 z-10 w-9 h-9 bg-white/90 backdrop-blur rounded-full
+                   flex items-center justify-center shadow-sm hover:bg-white hover:scale-105
+                   active:scale-95 transition-all duration-150"
+        title={saved ? 'Remove from saved' : 'Save event'}
+      >
+        {saved
+          ? <BookmarkCheck size={16} className="text-accent" />
+          : <Bookmark size={16} className="text-ink" />}
+      </button>
+
       {/* Content */}
-      <div className="p-4">
+      <div className="p-4 pointer-events-none">
         <h3 className="font-serif text-[17px] text-ink leading-snug line-clamp-2 mb-2.5 group-hover:text-accent transition-colors duration-150">
           {event.title}
         </h3>
@@ -125,6 +132,6 @@ export default function EventCard({ event, initialSaved = false }: Props) {
           </div>
         )}
       </div>
-    </Link>
+    </div>
   )
 }
