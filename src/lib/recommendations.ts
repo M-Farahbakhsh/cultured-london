@@ -20,6 +20,11 @@ export interface PreferenceProfile {
   // Events swiped "nah" in the taste deck — hard-excluded from recommendations,
   // not just down-weighted, so the exact card never resurfaces.
   dislikedEventIds: Set<string>
+  // Saved or enjoyed-attended — an explicit positive signal on the event
+  // itself. Without this, an event with no categories/tags/people (common
+  // for sparsely-tagged "Other" listings) contributes nothing when liked and
+  // can never clear a score > 0 gate, even though the user directly said yes.
+  likedEventIds: Set<string>
 }
 
 type EventSignal = { categories: Category[] | null; tags: string[] | null; people: string[] | null } | null
@@ -49,12 +54,13 @@ export async function buildPreferenceProfile(
     interestTerms: [],
     hasSignal: false,
     dislikedEventIds: new Set(),
+    likedEventIds: new Set(),
   }
 
   const [{ data: interests }, { data: saved }, { data: attended }, { data: disliked }] = await Promise.all([
     supabase.from('interests').select('name, type').eq('user_id', userId),
-    supabase.from('saved_events').select('event:events(categories, tags, people)').eq('user_id', userId),
-    supabase.from('attended_events').select('enjoyed, event:events(categories, tags, people)')
+    supabase.from('saved_events').select('event_id, event:events(categories, tags, people)').eq('user_id', userId),
+    supabase.from('attended_events').select('event_id, enjoyed, event:events(categories, tags, people)')
       .eq('user_id', userId).not('event_id', 'is', null),
     supabase.from('disliked_events').select('event_id, event:events(categories, tags, people)').eq('user_id', userId),
   ])
@@ -78,17 +84,19 @@ export async function buildPreferenceProfile(
     }
   }
 
-  for (const s of (saved ?? []) as unknown as { event: EventSignal }[]) {
-    if (!s.event) continue
+  for (const s of (saved ?? []) as unknown as { event_id: string; event: EventSignal }[]) {
     profile.hasSignal = true
+    profile.likedEventIds.add(s.event_id)
+    if (!s.event) continue
     addCategoryScore(profile, s.event.categories, WEIGHTS.saved)
     addTermScore(profile, [s.event.tags, s.event.people], WEIGHTS.saved)
   }
 
-  for (const a of (attended ?? []) as unknown as { enjoyed: boolean | null; event: EventSignal }[]) {
-    if (!a.event) continue
+  for (const a of (attended ?? []) as unknown as { event_id: string; enjoyed: boolean | null; event: EventSignal }[]) {
     profile.hasSignal = true
     const weight = a.enjoyed === false ? WEIGHTS.notEnjoyedAttended : WEIGHTS.enjoyedAttended
+    if (a.enjoyed !== false) profile.likedEventIds.add(a.event_id)
+    if (!a.event) continue
     addCategoryScore(profile, a.event.categories, weight)
     addTermScore(profile, [a.event.tags, a.event.people], weight)
   }
@@ -167,10 +175,18 @@ function pickReason<T>(pool: T[], seed: string): T {
 // appearing in a plain browse/search — just quietly, with no "for you" tag.
 const DISLIKED_EVENT_PENALTY = 100
 
+// A save/enjoyed-attend is a direct signal about *this* event, not just a
+// vote for its categories/tags. Sparsely-tagged events (no categories, no
+// people, no tags — common for the generic "Other" bucket) would otherwise
+// score exactly 0 when liked and never get a reason or clear a `score > 0`
+// recommendation filter, despite the user explicitly saying yes.
+const EXPLICIT_LIKE_BONUS = 5
+
 export function scoreEvent(event: Event, profile: PreferenceProfile): { score: number; reason: string | null } {
   const disliked = profile.dislikedEventIds.has(event.id)
+  const explicitlyLiked = !disliked && profile.likedEventIds.has(event.id)
 
-  let score = 0
+  let score = explicitlyLiked ? EXPLICIT_LIKE_BONUS : 0
   let bestTerm: { term: string; weight: number } | null = null
 
   for (const c of event.categories ?? []) {
