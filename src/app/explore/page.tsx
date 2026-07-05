@@ -57,12 +57,22 @@ function buildRpcBase(params: ResolvedParams) {
     }
   }
 
+  // Narrow, specific-day filters (today / this weekend / a single custom day)
+  // need the event's own start_datetime to actually fall in the window — a
+  // long-running series (e.g. a weekly meetup stored as one row spanning
+  // months) would otherwise pass the broader overlap check and surface
+  // under a date that has nothing to do with the requested day. Broader
+  // browsing (this week / this month / unfiltered) keeps the original
+  // overlap behavior, where "still running" is exactly what we want.
+  const strictStart = params.date === 'today' || params.date === 'this_weekend' || params.date === 'custom'
+
   return {
     p_from_time: fromTime,
     p_to_time: toTime,
     p_category: (params.category && params.category !== 'all') ? params.category : null,
     p_is_free: params.free === 'true' ? true : null,
     p_search: params.search || null,
+    p_strict_start: strictStart,
   }
 }
 
@@ -167,11 +177,12 @@ async function EventGrid({ searchParams }: PageProps) {
     const [{ data }, { data: countData }] = await Promise.all([
       supabase.rpc('get_unique_events', { ...rpcBase, p_limit: PAGE_SIZE, p_offset: offset }),
       supabase.rpc('count_unique_events', {
-        p_from_time: rpcBase.p_from_time,
-        p_to_time:   rpcBase.p_to_time,
-        p_category:  rpcBase.p_category,
-        p_is_free:   rpcBase.p_is_free,
-        p_search:    rpcBase.p_search,
+        p_from_time:    rpcBase.p_from_time,
+        p_to_time:      rpcBase.p_to_time,
+        p_category:     rpcBase.p_category,
+        p_is_free:      rpcBase.p_is_free,
+        p_search:       rpcBase.p_search,
+        p_strict_start: rpcBase.p_strict_start,
       }),
     ])
     enriched = score(displayAsOngoing((data ?? []) as Event[]))
