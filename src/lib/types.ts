@@ -1,6 +1,6 @@
 export type Category =
   | 'music' | 'art' | 'talk' | 'film' | 'tech'
-  | 'literature' | 'theatre' | 'comedy' | 'exhibition' | 'other'
+  | 'literature' | 'theatre' | 'comedy' | 'exhibition' | 'sports' | 'other'
 
 export type InterestType = 'artist' | 'author' | 'person' | 'topic' | 'venue' | 'genre'
 

@@ -31,6 +31,7 @@ TOPIC_MAP = {
              'dinner', 'venture', 'vc', 'investment'],
     'art': ['art', 'design', 'creative', 'photography', 'film', 'exhibition'],
     'music': ['music', 'concert', 'jazz', 'classical', 'electronic', 'gig'],
+    'sports': ['football', 'run club', '5-a-side', '5-aside', 'padel', 'rugby', 'cricket', 'sports', 'fitness'],
 }
 
 

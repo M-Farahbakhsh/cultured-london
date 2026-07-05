@@ -10,6 +10,7 @@ export const CATEGORY_META: Record<Category, { label: string; color: string; bg:
   theatre:     { label: 'Theatre',     color: 'text-pink-700',   bg: 'bg-pink-100' },
   comedy:      { label: 'Comedy',      color: 'text-yellow-700', bg: 'bg-yellow-100' },
   exhibition:  { label: 'Exhibition',  color: 'text-indigo-700', bg: 'bg-indigo-100' },
+  sports:      { label: 'Sports',      color: 'text-cyan-700',   bg: 'bg-cyan-100' },
   other:       { label: 'Other',       color: 'text-stone-700',  bg: 'bg-stone-100' },
 }
 
@@ -23,6 +24,7 @@ export const CATEGORY_GRADIENTS: Record<Category, string> = {
   theatre:    'from-pink-400 to-pink-600',
   comedy:     'from-yellow-400 to-yellow-600',
   exhibition: 'from-indigo-400 to-indigo-600',
+  sports:     'from-cyan-400 to-cyan-600',
   other:      'from-stone-400 to-stone-600',
 }
 

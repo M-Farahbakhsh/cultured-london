@@ -14,6 +14,7 @@ const CATEGORY_COLORS: Record<Category, string> = {
   theatre:    '#db2777',
   comedy:     '#ca8a04',
   exhibition: '#4f46e5',
+  sports:     '#0891b2',
   other:      '#78716c',
 }
 
@@ -28,6 +29,7 @@ const CATEGORY_EMOJI: Record<Category, string> = {
   theatre:    '🎭',
   comedy:     '😂',
   exhibition: '🖼️',
+  sports:     '🏆',
   other:      '✨',
 }
 

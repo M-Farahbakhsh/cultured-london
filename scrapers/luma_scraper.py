@@ -30,6 +30,7 @@ TOPIC_MAP = {
     'talk': ['ai', 'artificial intelligence', 'machine learning', 'data', 'panel', 'workshop', 'seminar', 'conference', 'summit', 'keynote', 'talk', 'networking', 'meetup', 'breakfast', 'lunch', 'dinner', 'venture', 'vc', 'investment'],
     'art': ['art', 'design', 'creative', 'photography', 'film', 'exhibition', 'gallery'],
     'music': ['music', 'concert', 'jazz', 'classical', 'electronic', 'gig'],
+    'sports': ['football', 'run club', '5-a-side', '5-aside', 'padel', 'rugby', 'cricket', 'sports', 'fitness'],
 }
 
 

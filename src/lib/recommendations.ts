@@ -66,7 +66,7 @@ export async function buildPreferenceProfile(
   ])
 
   const CATEGORY_NAMES = new Set<string>([
-    'music', 'art', 'talk', 'film', 'tech', 'literature', 'theatre', 'comedy', 'exhibition', 'other',
+    'music', 'art', 'talk', 'film', 'tech', 'literature', 'theatre', 'comedy', 'exhibition', 'sports', 'other',
   ])
   for (const i of interests ?? []) {
     profile.hasSignal = true

@@ -17,6 +17,7 @@ const CATEGORIES: Array<{ value: Category | 'all'; label: string }> = [
   { value: 'theatre', label: 'Theatre' },
   { value: 'exhibition', label: 'Exhibitions' },
   { value: 'comedy', label: 'Comedy' },
+  { value: 'sports', label: 'Sports' },
 ]
 
 const DATE_PRESETS: Array<{ value: DateFilter; label: string }> = [

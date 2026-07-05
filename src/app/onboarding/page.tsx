@@ -18,6 +18,7 @@ const TASTE_TILES: { emoji: string; label: string; type: 'genre' | 'topic'; name
   { emoji: '🎬', label: 'Film',              type: 'genre', name: 'film',        gradient: 'from-teal-500 to-teal-700' },
   { emoji: '🎭', label: 'Theatre',           type: 'genre', name: 'theatre',     gradient: 'from-pink-500 to-pink-700' },
   { emoji: '📚', label: 'Books & writing',   type: 'genre', name: 'literature',  gradient: 'from-green-600 to-green-800' },
+  { emoji: '🏆', label: 'Sports',            type: 'genre', name: 'sports',      gradient: 'from-sky-500 to-sky-700' },
   { emoji: '🎷', label: 'Jazz nights',       type: 'topic', name: 'jazz',        gradient: 'from-indigo-500 to-indigo-700' },
   { emoji: '🪩', label: 'Club nights',       type: 'topic', name: 'club',        gradient: 'from-fuchsia-500 to-fuchsia-700' },
   { emoji: '🚀', label: 'Startups',          type: 'topic', name: 'startup',     gradient: 'from-slate-600 to-slate-800' },

@@ -40,7 +40,7 @@ CATEGORY_PAGES = [
     ('other',   'https://www.eventbrite.co.uk/d/united-kingdom--london/food-and-drink/'),
     ('talk',    'https://www.eventbrite.co.uk/d/united-kingdom--london/business/'),
     ('other',   'https://www.eventbrite.co.uk/d/united-kingdom--london/health/'),
-    ('other',   'https://www.eventbrite.co.uk/d/united-kingdom--london/sports-fitness/'),
+    ('sports',  'https://www.eventbrite.co.uk/d/united-kingdom--london/sports-fitness/'),
     ('talk',    'https://www.eventbrite.co.uk/d/united-kingdom--london/networking/'),
     ('other',   'https://www.eventbrite.co.uk/d/united-kingdom--london/family-education/'),
     ('other',   'https://www.eventbrite.co.uk/d/united-kingdom--london/fashion/'),

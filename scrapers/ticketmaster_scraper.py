@@ -27,7 +27,7 @@ SEGMENT_MAP = {
     'Music': 'music',
     'Arts & Theatre': 'theatre',
     'Film': 'film',
-    'Sports': 'other',
+    'Sports': 'sports',
     'Miscellaneous': 'other',
     'Undefined': 'other',
 }
