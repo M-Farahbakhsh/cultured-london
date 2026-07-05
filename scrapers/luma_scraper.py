@@ -25,7 +25,8 @@ HEADERS = {
 }
 
 TOPIC_MAP = {
-    'tech': ['tech', 'software', 'code', 'developer', 'engineer', 'startup', 'saas', 'product', 'founder'],
+    'tech': ['tech', 'software', 'code', 'coding', 'developer', 'dev', 'engineer', 'engineering',
+             'startup', 'saas', 'product', 'founder', 'hackathon', 'hack', 'app', 'agent', 'api'],
     'talk': ['ai', 'artificial intelligence', 'machine learning', 'data', 'panel', 'workshop', 'seminar', 'conference', 'summit', 'keynote', 'talk', 'networking', 'meetup', 'breakfast', 'lunch', 'dinner', 'venture', 'vc', 'investment'],
     'art': ['art', 'design', 'creative', 'photography', 'film', 'exhibition', 'gallery'],
     'music': ['music', 'concert', 'jazz', 'classical', 'electronic', 'gig'],
@@ -33,10 +34,16 @@ TOPIC_MAP = {
 
 
 def guess_category(name: str) -> str:
+    # Whole-word matching only — a raw substring check let short keywords like
+    # "ai" match "email"/"chair"/"maintain", "app" match "happy"/"apple", etc.
+    # "hackathon"/"app"/"agent"/"api" were also just missing from `tech`
+    # entirely, which is why an event literally titled "... Agent Hackathon"
+    # fell all the way through to "other".
     text = name.lower()
     for cat, keywords in TOPIC_MAP.items():
-        if any(k in text for k in keywords):
-            return cat
+        for kw in keywords:
+            if re.search(r'\b' + re.escape(kw) + r's?\b', text):
+                return cat
     return 'other'
 
 

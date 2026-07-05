@@ -2,7 +2,7 @@
 Meetup.com scraper for London events.
 Uses Meetup's public keywordSearch GraphQL operation (no auth required for public events).
 """
-import os, requests
+import os, re, requests
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 from supabase import create_client
@@ -31,7 +31,8 @@ HEADERS = {
 }
 
 TOPIC_MAP = {
-    'tech': ['tech', 'software', 'python', 'javascript', 'ai', 'machine learning', 'data science', 'startup'],
+    'tech': ['tech', 'software', 'python', 'javascript', 'ai', 'machine learning', 'data science', 'startup',
+             'coding', 'developer', 'dev', 'engineer', 'engineering', 'hackathon', 'hack', 'app', 'agent', 'api'],
     'art': ['art', 'photography', 'design', 'creative'],
     'music': ['music', 'jazz', 'classical', 'electronic'],
     'talk': ['philosophy', 'science', 'politics', 'literature', 'book'],
@@ -39,9 +40,15 @@ TOPIC_MAP = {
 }
 
 
+def _keyword_matches(text: str, kw: str) -> bool:
+    # Whole-word (plus simple plural) matching — a raw substring check let
+    # short keywords like "ai" match "email"/"chair", "app" match "happy".
+    return re.search(r'\b' + re.escape(kw) + r's?\b', text) is not None
+
+
 def guess_categories(title: str, description: str) -> list[str]:
     text = (title + ' ' + description).lower()
-    cats = [cat for cat, kws in TOPIC_MAP.items() if kws and any(k in text for k in kws)]
+    cats = [cat for cat, kws in TOPIC_MAP.items() if kws and any(_keyword_matches(text, k) for k in kws)]
     return cats[:2] or ['other']
 
 

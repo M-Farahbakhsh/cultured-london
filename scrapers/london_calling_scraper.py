@@ -27,7 +27,8 @@ HEADERS = {
 LONDON_CALLING_URL = 'https://www.londoncalling.guide/events'
 
 TOPIC_MAP = {
-    'tech': ['tech', 'software', 'code', 'developer', 'engineer', 'startup', 'saas', 'product', 'founder'],
+    'tech': ['tech', 'software', 'code', 'coding', 'developer', 'dev', 'engineer', 'engineering',
+             'startup', 'saas', 'product', 'founder', 'hackathon', 'hack', 'app', 'agent', 'api'],
     'talk': ['ai', 'artificial intelligence', 'machine learning', 'data', 'panel', 'workshop', 'seminar',
              'conference', 'summit', 'keynote', 'talk', 'networking', 'meetup', 'breakfast', 'lunch',
              'dinner', 'venture', 'vc', 'investment'],
@@ -37,10 +38,13 @@ TOPIC_MAP = {
 
 
 def guess_category(name: str) -> str:
+    # Whole-word (plus simple plural) matching — a raw substring check let
+    # short keywords like "ai" match "email"/"chair", "app" match "happy".
     text = name.lower()
     for cat, keywords in TOPIC_MAP.items():
-        if any(k in text for k in keywords):
-            return cat
+        for kw in keywords:
+            if re.search(r'\b' + re.escape(kw) + r's?\b', text):
+                return cat
     return 'other'
 
 
