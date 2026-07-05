@@ -81,6 +81,15 @@ export function getDateRange(filter: DateFilter): { from: Date; to: Date } {
     }
     case 'this_weekend': {
       const day = today.getDay()
+      // Sunday is already the weekend — (6 - 0 + 7) % 7 = 6 would otherwise
+      // jump a full week ahead to *next* Saturday instead of showing what's
+      // left of the one happening right now. Start from this instant (not
+      // Sunday's midnight) so an already-passed Saturday doesn't resurface.
+      if (day === 0) {
+        const mon = new Date(today)
+        mon.setDate(today.getDate() + 1)
+        return { from: now, to: mon }
+      }
       const sat = new Date(today)
       sat.setDate(today.getDate() + ((6 - day + 7) % 7))
       const mon = new Date(sat)
