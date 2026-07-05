@@ -53,6 +53,10 @@ export default async function HomePage({ searchParams }: PageProps) {
   // ranked against a pool of upcoming events. Falls back to soonest events until
   // the user has given us any signal.
   const prefProfile = await buildPreferenceProfile(supabase, user.id)
+  // "Nah" in the taste deck is final — keep it out of every list on this page,
+  // not just the scored/ranked one.
+  const soonFiltered = ((soonRaw ?? []) as Event[]).filter(ev => !prefProfile.dislikedEventIds.has(ev.id))
+
   let pickedRaw: Event[] = []
   if (prefProfile.hasSignal) {
     const { data } = await supabase.rpc('get_unique_events', {
@@ -70,7 +74,7 @@ export default async function HomePage({ searchParams }: PageProps) {
   const GRID_SIZE = 9
   if (pickedRaw.length > 0 && pickedRaw.length < GRID_SIZE) {
     const seen = new Set(pickedRaw.map(ev => ev.id))
-    for (const ev of (soonRaw ?? []) as Event[]) {
+    for (const ev of soonFiltered) {
       if (pickedRaw.length >= GRID_SIZE) break
       if (!seen.has(ev.id)) { pickedRaw.push(ev); seen.add(ev.id) }
     }
@@ -92,7 +96,7 @@ export default async function HomePage({ searchParams }: PageProps) {
   })
   const enrich = (evs: unknown[]) => displayAsOngoing(evs).map(ev => ({ ...ev, saved: savedIds.has(ev.id) }))
 
-  const picked = enrich(personalized ? pickedRaw : (soonRaw ?? []).slice(0, 9))
+  const picked = enrich(personalized ? pickedRaw : soonFiltered.slice(0, 9))
 
   const firstName = profile?.full_name?.split(' ')[0] || user.email?.split('@')[0] || 'there'
 

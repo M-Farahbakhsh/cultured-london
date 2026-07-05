@@ -9,6 +9,7 @@ const WEIGHTS = {
   enjoyedAttended: 3,
   saved: 1.5,
   notEnjoyedAttended: -2,
+  dislikedSwipe: -2,
 } as const
 
 export interface PreferenceProfile {
@@ -16,6 +17,9 @@ export interface PreferenceProfile {
   termScore: Map<string, number>
   interestTerms: string[]
   hasSignal: boolean
+  // Events swiped "nah" in the taste deck — hard-excluded from recommendations,
+  // not just down-weighted, so the exact card never resurfaces.
+  dislikedEventIds: Set<string>
 }
 
 type EventSignal = { categories: Category[] | null; tags: string[] | null; people: string[] | null } | null
@@ -44,13 +48,15 @@ export async function buildPreferenceProfile(
     termScore: new Map(),
     interestTerms: [],
     hasSignal: false,
+    dislikedEventIds: new Set(),
   }
 
-  const [{ data: interests }, { data: saved }, { data: attended }] = await Promise.all([
+  const [{ data: interests }, { data: saved }, { data: attended }, { data: disliked }] = await Promise.all([
     supabase.from('interests').select('name, type').eq('user_id', userId),
     supabase.from('saved_events').select('event:events(categories, tags, people)').eq('user_id', userId),
     supabase.from('attended_events').select('enjoyed, event:events(categories, tags, people)')
       .eq('user_id', userId).not('event_id', 'is', null),
+    supabase.from('disliked_events').select('event_id, event:events(categories, tags, people)').eq('user_id', userId),
   ])
 
   const CATEGORY_NAMES = new Set<string>([
@@ -81,6 +87,14 @@ export async function buildPreferenceProfile(
     const weight = a.enjoyed === false ? WEIGHTS.notEnjoyedAttended : WEIGHTS.enjoyedAttended
     addCategoryScore(profile, a.event.categories, weight)
     addTermScore(profile, [a.event.tags, a.event.people], weight)
+  }
+
+  for (const d of (disliked ?? []) as unknown as { event_id: string; event: EventSignal }[]) {
+    profile.hasSignal = true
+    profile.dislikedEventIds.add(d.event_id)
+    if (!d.event) continue
+    addCategoryScore(profile, d.event.categories, WEIGHTS.dislikedSwipe)
+    addTermScore(profile, [d.event.tags, d.event.people], WEIGHTS.dislikedSwipe)
   }
 
   return profile
@@ -129,7 +143,16 @@ function pickReason<T>(pool: T[], seed: string): T {
   return pool[Math.abs(hash) % pool.length]
 }
 
+// A dislike shouldn't erase the event everywhere — it should just stop
+// being *recommended*. This is subtracted on top of normal scoring so a
+// disliked event reliably drops out of "picked for you" filters (score > 0)
+// and sorts to the bottom wherever results are ranked by score, while still
+// appearing in a plain browse/search — just quietly, with no "for you" tag.
+const DISLIKED_EVENT_PENALTY = 100
+
 export function scoreEvent(event: Event, profile: PreferenceProfile): { score: number; reason: string | null } {
+  const disliked = profile.dislikedEventIds.has(event.id)
+
   let score = 0
   let bestTerm: { term: string; weight: number } | null = null
 
@@ -149,11 +172,16 @@ export function scoreEvent(event: Event, profile: PreferenceProfile): { score: n
   }
 
   let reason: string | null = null
-  const topCategory = (event.categories ?? []).find(c => (profile.categoryScore[c] ?? 0) > 0)
-  if (topCategory && topCategory !== 'other') {
-    reason = pickReason(CATEGORY_VIBE_REASONS, event.id)(topCategory)
-  } else if (score > 0) {
-    reason = pickReason(GENERIC_VIBE_REASONS, event.id)
+  if (disliked) {
+    // Never claim "you like this" about something they explicitly swiped no on.
+    score -= DISLIKED_EVENT_PENALTY
+  } else {
+    const topCategory = (event.categories ?? []).find(c => (profile.categoryScore[c] ?? 0) > 0)
+    if (topCategory && topCategory !== 'other') {
+      reason = pickReason(CATEGORY_VIBE_REASONS, event.id)(topCategory)
+    } else if (score > 0) {
+      reason = pickReason(GENERIC_VIBE_REASONS, event.id)
+    }
   }
 
   return { score, reason }

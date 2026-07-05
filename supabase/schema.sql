@@ -61,6 +61,18 @@ CREATE TABLE IF NOT EXISTS saved_events (
   UNIQUE (user_id, event_id)
 );
 
+-- Events the user swiped "nah" on in the taste deck — kept separate from
+-- attended_events since a dislike here means "never got to it," not "went
+-- and didn't enjoy it." Used to (a) never resurface this exact event again
+-- and (b) push down its categories/tags in future recommendations.
+CREATE TABLE IF NOT EXISTS disliked_events (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  event_id    UUID REFERENCES events(id) ON DELETE CASCADE NOT NULL,
+  disliked_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (user_id, event_id)
+);
+
 -- Events the user has attended (past events log)
 CREATE TABLE IF NOT EXISTS attended_events (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -94,6 +106,7 @@ CREATE TABLE IF NOT EXISTS friendships (
 ALTER TABLE profiles       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE interests      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE saved_events   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE disliked_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE attended_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE friendships    ENABLE ROW LEVEL SECURITY;
 
@@ -123,6 +136,10 @@ CREATE POLICY "Public interests viewable"
 -- Saved events: own only
 CREATE POLICY "Users manage own saved events"
   ON saved_events FOR ALL USING (auth.uid() = user_id);
+
+-- Disliked events: own only
+CREATE POLICY "Users manage own disliked events"
+  ON disliked_events FOR ALL USING (auth.uid() = user_id);
 
 -- Attended events: own only (with option to view friend's if public)
 CREATE POLICY "Users manage own attended events"
@@ -171,4 +188,5 @@ CREATE INDEX IF NOT EXISTS idx_events_people       ON events USING gin (people);
 CREATE INDEX IF NOT EXISTS idx_events_tags         ON events USING gin (tags);
 CREATE INDEX IF NOT EXISTS idx_interests_user      ON interests (user_id);
 CREATE INDEX IF NOT EXISTS idx_saved_user          ON saved_events (user_id);
+CREATE INDEX IF NOT EXISTS idx_disliked_user        ON disliked_events (user_id);
 CREATE INDEX IF NOT EXISTS idx_friendships_users   ON friendships (requester_id, addressee_id);

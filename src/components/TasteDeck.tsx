@@ -113,16 +113,27 @@ export default function TasteDeck({ events, userId }: { events: Event[]; userId:
   const swipe = (dir: 1 | -1) => {
     if (!current) return
     setExitDir(dir)
+    // NB: the supabase builder only executes when awaited/.then'd — a bare
+    // `void` discards it without ever sending the request.
     if (dir === 1) {
       setLikedCount(c => c + 1)
       // A right swipe is a save, which the recommender reads directly.
-      // NB: the supabase builder only executes when awaited/.then'd — a bare
-      // `void` discards it without ever sending the request.
       supabase
         .from('saved_events')
         .insert({ user_id: userId, event_id: current.id })
         .then(({ error }) => {
           if (error) console.error('Failed to save liked event:', error.message)
+        })
+    } else {
+      // A left swipe used to vanish with no record at all — meaning a "nah"
+      // could resurface as a recommendation later. Now it's remembered so
+      // this exact event is excluded going forward and its category/tags
+      // get pushed down in future ranking.
+      supabase
+        .from('disliked_events')
+        .upsert({ user_id: userId, event_id: current.id }, { onConflict: 'user_id,event_id', ignoreDuplicates: true })
+        .then(({ error }) => {
+          if (error) console.error('Failed to record disliked event:', error.message)
         })
     }
     setIndex(i => i + 1)

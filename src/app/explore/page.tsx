@@ -115,7 +115,7 @@ async function EventGrid({ searchParams }: PageProps) {
   const rpcBase = buildRpcBase(params)
 
   let savedIds = new Set<string>()
-  let profile: PreferenceProfile = { categoryScore: {}, termScore: new Map(), interestTerms: [], hasSignal: false }
+  let profile: PreferenceProfile = { categoryScore: {}, termScore: new Map(), interestTerms: [], hasSignal: false, dislikedEventIds: new Set() }
 
   if (user) {
     const [{ data: saved }, builtProfile] = await Promise.all([

@@ -14,21 +14,24 @@ export default async function TastePage() {
   if (!user) redirect('/')
 
   const now = new Date().toISOString()
-  const [{ data: eventsRaw }, { data: savedRaw }] = await Promise.all([
+  const [{ data: eventsRaw }, { data: savedRaw }, { data: dislikedRaw }] = await Promise.all([
     supabase.rpc('get_unique_events', {
       p_from_time: now,
       p_to_time: '2099-01-01T00:00:00Z',
       p_limit: 120, p_offset: 0,
     }),
     supabase.from('saved_events').select('event_id').eq('user_id', user.id),
+    supabase.from('disliked_events').select('event_id').eq('user_id', user.id),
   ])
 
   const savedIds = new Set((savedRaw ?? []).map((s: { event_id: string }) => s.event_id))
+  const dislikedIds = new Set((dislikedRaw ?? []).map((d: { event_id: string }) => d.event_id))
 
-  // Deck wants photogenic variety: images only, nothing already saved, and
-  // interleaved across categories so ten club nights in a row can't happen.
+  // Deck wants photogenic variety: images only, nothing already saved or
+  // already swiped "nah", and interleaved across categories so ten club
+  // nights in a row can't happen.
   const candidates = ((eventsRaw ?? []) as Event[])
-    .filter(ev => ev.image_url && !savedIds.has(ev.id))
+    .filter(ev => ev.image_url && !savedIds.has(ev.id) && !dislikedIds.has(ev.id))
 
   const byCategory = new Map<string, Event[]>()
   for (const ev of candidates) {
