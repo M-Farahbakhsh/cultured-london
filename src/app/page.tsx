@@ -43,14 +43,14 @@ export default async function LandingPage() {
       {/* Punchy pitch */}
       <div className="w-full max-w-md text-center mb-4">
         <p className="text-accent text-xs font-semibold uppercase tracking-[0.15em] mb-3">
-          london · picked for you
+          london · zero fomo
         </p>
         <h1 className="font-serif text-4xl sm:text-5xl text-ink tracking-tight leading-tight">
-          stop scrolling.<br /><em>start going.</em>
+          delete the doomscroll.<br /><em>book the night.</em>
         </h1>
         <p className="text-muted text-base mt-4 leading-relaxed">
-          gigs, raves, talks, galleries — matched to your taste, not an algorithm&apos;s mood.
-          every pick comes with a reason.
+          gigs, raves, talks, galleries — matched to your taste, not vibes-based guessing.
+          every pick&apos;s got receipts.
         </p>
       </div>
 
