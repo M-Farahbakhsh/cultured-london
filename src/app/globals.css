@@ -108,6 +108,16 @@ html {
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+/* Roundel logo — a lazy full spin every few seconds, on top of (not instead
+   of) the hover-triggered spin already on a separate nested element. */
+.roundel-idle-spin {
+  animation: roundel-idle-spin 6s ease-in-out infinite;
+}
+@keyframes roundel-idle-spin {
+  0%, 80% { transform: rotate(0deg); }
+  100%    { transform: rotate(360deg); }
+}
+
 /* Instrument Serif ships one weight — stop the browser faux-bolding it */
 .font-serif, .section-title {
   font-weight: 400;

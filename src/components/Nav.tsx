@@ -46,10 +46,12 @@ export default function Nav() {
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col fixed left-0 top-0 h-full w-56 bg-surface border-r border-border z-30 py-6 px-4">
         <Link href="/home" className="flex items-center gap-3 mb-10 px-1 group">
-          <span className="transition-transform duration-500 group-hover:rotate-[360deg]">
-            <Roundel size={52} />
+          <span className="roundel-idle-spin inline-block">
+            <span className="inline-block transition-transform duration-500 group-hover:rotate-[360deg]">
+              <Roundel size={58} />
+            </span>
           </span>
-          <span className="font-serif italic text-[27px] text-ink tracking-tight leading-none">
+          <span className="font-serif italic text-[29px] text-ink tracking-tight leading-none">
             London<span className="text-accent">.</span>
           </span>
         </Link>

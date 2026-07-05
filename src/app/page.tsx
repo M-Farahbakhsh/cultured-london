@@ -4,11 +4,14 @@ import Roundel from '@/components/Roundel'
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-bg flex flex-col items-center px-4 py-12 sm:py-16">
-      {/* Wordmark */}
-      <div className="flex items-center gap-2.5 mb-10">
-        <Roundel size={40} />
-        <span className="font-serif italic text-2xl text-ink tracking-tight leading-none">
-          Cultured<span className="text-accent">.</span>
+      {/* Wordmark — Roundel already reads "CULTURED", so the wordmark text
+          is "London." next to it, not "Cultured." (that repeated itself). */}
+      <div className="flex items-center gap-3 mb-10">
+        <span className="roundel-idle-spin inline-block">
+          <Roundel size={52} />
+        </span>
+        <span className="font-serif italic text-[28px] text-ink tracking-tight leading-none">
+          London<span className="text-accent">.</span>
         </span>
       </div>
 
