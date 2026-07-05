@@ -2,9 +2,20 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Mail, Lock, User, Sparkles } from 'lucide-react'
+import { Mail, Lock, User, Sparkles, MailCheck } from 'lucide-react'
 
 type Mode = 'signin' | 'signup'
+
+// Supabase's raw auth error text is accurate but reads like a server log —
+// translate the common ones into something a person would actually say.
+function friendlyAuthError(message: string): string {
+  const m = message.toLowerCase()
+  if (m.includes('rate limit')) return "too many attempts in a row — give it a few minutes and try again."
+  if (m.includes('already registered')) return 'looks like you already have an account — try signing in instead.'
+  if (m.includes('invalid login credentials')) return "that email or password doesn't match — check and try again."
+  if (m.includes('email not confirmed')) return "your email isn't confirmed yet — check your inbox for the link."
+  return message
+}
 
 export default function AuthForm() {
   const [mode, setMode] = useState<Mode>('signin')
@@ -13,6 +24,7 @@ export default function AuthForm() {
   const [name, setName] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -22,18 +34,42 @@ export default function AuthForm() {
     setLoading(true)
 
     if (mode === 'signup') {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email, password,
         options: { data: { full_name: name } },
       })
-      if (error) { setError(error.message); setLoading(false); return }
+      if (error) { setError(friendlyAuthError(error.message)); setLoading(false); return }
+
+      // No session back means email confirmation is required before the
+      // account is usable — tell people, instead of silently bouncing
+      // them off the auth-gated /onboarding route.
+      if (!data.session) {
+        setAwaitingConfirmation(true)
+        setLoading(false)
+        return
+      }
       router.push('/onboarding')
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) { setError(error.message); setLoading(false); return }
+      if (error) { setError(friendlyAuthError(error.message)); setLoading(false); return }
       router.push('/home')
     }
     router.refresh()
+  }
+
+  if (awaitingConfirmation) {
+    return (
+      <div className="card w-full max-w-sm p-7 sm:p-8 text-center">
+        <div className="w-12 h-12 rounded-full bg-accent-soft flex items-center justify-center mx-auto mb-4">
+          <MailCheck size={22} className="text-accent" />
+        </div>
+        <h2 className="font-serif text-2xl text-ink tracking-tight mb-1">check your inbox</h2>
+        <p className="text-muted text-sm leading-relaxed">
+          we sent a confirmation link to <span className="text-ink font-medium">{email}</span>.
+          click it to activate your account — then come back and sign in.
+        </p>
+      </div>
+    )
   }
 
   return (
