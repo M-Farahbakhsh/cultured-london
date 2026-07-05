@@ -6,7 +6,7 @@ import Nav from '@/components/Nav'
 import CategoryChip from '@/components/CategoryChip'
 import EventCard from '@/components/EventCard'
 import type { Category, Event } from '@/lib/types'
-import { formatDate, formatTime, formatPrice } from '@/lib/utils'
+import { formatDate, formatTime, formatPrice, decodeHtmlEntities } from '@/lib/utils'
 
 interface Props { params: Promise<{ id: string }> }
 
@@ -73,7 +73,7 @@ export default async function EventPage({ params }: Props) {
           <div className="card overflow-hidden mb-6">
             <div className="h-56 bg-gradient-to-br from-purple-400 to-blue-600 relative">
               {event.image_url && (
-                <img src={event.image_url} alt={event.title} className="w-full h-full object-cover" />
+                <img src={event.image_url} alt={decodeHtmlEntities(event.title)} className="w-full h-full object-cover" />
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
             </div>
@@ -85,7 +85,7 @@ export default async function EventPage({ params }: Props) {
                 ))}
               </div>
 
-              <h1 className="text-2xl font-bold text-ink mb-4">{event.title}</h1>
+              <h1 className="text-2xl font-bold text-ink mb-4">{decodeHtmlEntities(event.title)}</h1>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
                 <div className="flex items-start gap-2.5 text-sm">
@@ -124,7 +124,7 @@ export default async function EventPage({ params }: Props) {
               {/* Description */}
               {event.description && (
                 <div className="prose prose-sm max-w-none text-ink/80 mb-5">
-                  <p className="whitespace-pre-wrap">{event.description}</p>
+                  <p className="whitespace-pre-wrap">{decodeHtmlEntities(event.description)}</p>
                 </div>
               )}
 

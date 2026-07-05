@@ -4,7 +4,7 @@ import { Clock, Search, ThumbsUp, ThumbsDown, Plus, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import Nav from '@/components/Nav'
 import type { AttendedEvent, Event } from '@/lib/types'
-import { formatDate } from '@/lib/utils'
+import { formatDate, decodeHtmlEntities } from '@/lib/utils'
 
 export default function PastEventsPage() {
   const [attended, setAttended] = useState<AttendedEvent[]>([])
@@ -88,7 +88,7 @@ export default function PastEventsPage() {
     setAttended(prev => prev.filter(a => a.id !== id))
   }
 
-  const getTitle = (a: AttendedEvent) => a.event?.title ?? a.manual_title ?? 'Unnamed event'
+  const getTitle = (a: AttendedEvent) => decodeHtmlEntities(a.event?.title ?? a.manual_title ?? 'Unnamed event')
   const getVenue = (a: AttendedEvent) => a.event?.venue_name ?? a.manual_venue
   const getDate = (a: AttendedEvent) => a.event?.start_datetime
     ? formatDate(a.event.start_datetime)
@@ -146,7 +146,7 @@ export default function PastEventsPage() {
                       onClick={() => addAttended(ev)}
                       className="w-full text-left px-4 py-3 hover:bg-bg transition-colors border-b border-border last:border-0"
                     >
-                      <p className="text-sm font-medium text-ink">{ev.title}</p>
+                      <p className="text-sm font-medium text-ink">{decodeHtmlEntities(ev.title)}</p>
                       <p className="text-xs text-muted mt-0.5">{ev.venue_name} · {formatDate(ev.start_datetime)}</p>
                     </button>
                   ))}

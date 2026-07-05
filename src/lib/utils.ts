@@ -94,6 +94,30 @@ export function getDateRange(filter: DateFilter): { from: Date; to: Date } {
   }
 }
 
+const HTML_ENTITIES: Record<string, string> = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+  mdash: '—', ndash: '–', hellip: '…',
+  lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”',
+}
+
+// Some scraped sources (unlike Luma, which already gets cleaned in the
+// scraper) store titles/descriptions with raw HTML entities intact —
+// "Xero APP &amp; Agent Hackathon" instead of "Xero APP & Agent Hackathon".
+// Pure string replace so it works identically server- and client-side
+// (no DOM/document available during SSR).
+export function decodeHtmlEntities(text: string): string {
+  if (!text) return text
+  return text.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (match, entity: string) => {
+    if (entity[0] === '#') {
+      const code = entity[1] === 'x' || entity[1] === 'X'
+        ? parseInt(entity.slice(2), 16)
+        : parseInt(entity.slice(1), 10)
+      return Number.isNaN(code) ? match : String.fromCodePoint(code)
+    }
+    return HTML_ENTITIES[entity] ?? match
+  })
+}
+
 export function jaccardSimilarity(a: string[], b: string[]): number {
   const setA = new Set(a.map(s => s.toLowerCase()))
   const setB = new Set(b.map(s => s.toLowerCase()))

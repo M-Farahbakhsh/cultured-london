@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef } from 'react'
 import type { Event, Category } from '@/lib/types'
-import { formatDate, formatTime, formatPrice, CATEGORY_META } from '@/lib/utils'
+import { formatDate, formatTime, formatPrice, CATEGORY_META, decodeHtmlEntities } from '@/lib/utils'
 
 // Same hues as CATEGORY_META, as flat hex for Leaflet's inline-styled markers.
 const CATEGORY_COLORS: Record<Category, string> = {
@@ -107,7 +107,7 @@ export default function MapView({ events, totalCount }: Props) {
         const popup = L.popup({ maxWidth: 260, className: 'map-popup' }).setContent(`
           <div style="font-family:Inter,system-ui,sans-serif;padding:2px 2px 4px">
             <span style="display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:${color};margin-bottom:6px">${emoji} ${CATEGORY_META[cat]?.label ?? cat}</span>
-            <p style="font-family:'Instrument Serif',Georgia,serif;font-size:17px;line-height:1.25;margin:0 0 6px;color:#1A1817">${event.title}</p>
+            <p style="font-family:'Instrument Serif',Georgia,serif;font-size:17px;line-height:1.25;margin:0 0 6px;color:#1A1817">${decodeHtmlEntities(event.title)}</p>
             <p style="font-size:12px;color:#6F6A63;margin:0 0 2px">${formatDate(event.start_datetime)} · ${formatTime(event.start_datetime)}</p>
             ${event.venue_name ? `<p style="font-size:12px;color:#6F6A63;margin:0 0 8px">${event.venue_name}</p>` : ''}
             <div style="display:flex;align-items:center;justify-content:space-between">

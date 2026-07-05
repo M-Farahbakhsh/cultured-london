@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Bookmark, BookmarkCheck, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import type { Event, Category } from '@/lib/types'
-import { CATEGORY_GRADIENTS, formatDate, formatTime, formatPrice } from '@/lib/utils'
+import { CATEGORY_GRADIENTS, formatDate, formatTime, formatPrice, decodeHtmlEntities } from '@/lib/utils'
 import CategoryChip from './CategoryChip'
 import { createClient } from '@/lib/supabase/client'
 
@@ -89,7 +89,7 @@ export default function EventCard({ event, initialSaved = false }: Props) {
       {/* Content */}
       <div className="p-4 pointer-events-none">
         <h3 className="font-serif text-[17px] text-ink leading-snug line-clamp-2 mb-2.5 group-hover:text-accent transition-colors duration-150">
-          {event.title}
+          {decodeHtmlEntities(event.title)}
         </h3>
 
         <div className="space-y-1 text-xs text-muted">
@@ -117,7 +117,7 @@ export default function EventCard({ event, initialSaved = false }: Props) {
           <div className="overflow-hidden max-h-0 group-hover:max-h-32 transition-all duration-300 ease-out">
             <div className="pt-2.5 mt-2.5 border-t border-border">
               {event.description ? (
-                <p className="text-xs text-muted line-clamp-3 leading-relaxed">{event.description}</p>
+                <p className="text-xs text-muted line-clamp-3 leading-relaxed">{decodeHtmlEntities(event.description)}</p>
               ) : (
                 <div className="space-y-1">
                   {event.people && event.people.length > 0 && (

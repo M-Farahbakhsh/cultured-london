@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { motion, useMotionValue, useTransform, AnimatePresence } from 'framer-motion'
 import { Heart, X, ArrowRight, Sparkles } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { formatDate, formatTime, formatPrice, CATEGORY_META } from '@/lib/utils'
+import { formatDate, formatTime, formatPrice, CATEGORY_META, decodeHtmlEntities } from '@/lib/utils'
 import type { Event, Category } from '@/lib/types'
 
 const SWIPE_THRESHOLD = 120
@@ -57,7 +57,7 @@ function SwipeCard({
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={event.image_url}
-          alt={event.title}
+          alt={decodeHtmlEntities(event.title)}
           draggable={false}
           className="absolute inset-0 w-full h-full object-cover pointer-events-none"
         />
@@ -86,7 +86,7 @@ function SwipeCard({
           {meta.label}
         </span>
         <h3 className="font-serif text-2xl sm:text-3xl text-white tracking-tight leading-tight line-clamp-3 drop-shadow">
-          {event.title}
+          {decodeHtmlEntities(event.title)}
         </h3>
         <p className="text-white/75 text-sm mt-2.5">
           {formatDate(event.start_datetime)} · {formatTime(event.start_datetime)}
