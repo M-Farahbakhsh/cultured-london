@@ -1,30 +1,7 @@
 import AuthForm from '@/components/AuthForm'
 import Roundel from '@/components/Roundel'
-import LiveTicker from '@/components/LiveTicker'
-import { createClient } from '@/lib/supabase/server'
-import { formatDate } from '@/lib/utils'
 
-export const dynamic = 'force-dynamic'
-
-export default async function LandingPage() {
-  const supabase = await createClient()
-  const now = new Date().toISOString()
-  const { data: liveCount } = await supabase.rpc('count_unique_events', {
-    p_from_time: now,
-    p_to_time:   '2099-01-01T00:00:00Z',
-    p_category:  null,
-    p_is_free:   null,
-    p_search:    null,
-  })
-
-  const tickerItems = [
-    `${(liveCount as number ?? 0).toLocaleString()} events on. zero excuses`,
-    formatDate(new Date().toISOString()).toLowerCase(),
-    'no account needed to just look around',
-    'gigs · raves · galleries · comedy · everything',
-    'sign up once, get picked for forever',
-  ]
-
+export default function LandingPage() {
   return (
     <div className="min-h-screen bg-bg flex flex-col items-center px-4 py-12 sm:py-16">
       {/* Wordmark — Roundel already reads "CULTURED", so the wordmark text
@@ -38,10 +15,6 @@ export default async function LandingPage() {
         <span className="font-serif italic text-[28px] text-ink tracking-tight leading-none">
           London<span className="text-accent">.</span>
         </span>
-      </div>
-
-      <div className="w-full max-w-md">
-        <LiveTicker items={tickerItems} />
       </div>
 
       {/* Punchy pitch */}
