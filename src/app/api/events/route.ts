@@ -14,9 +14,9 @@ export async function GET(request: NextRequest) {
     .order('start_datetime', { ascending: true })
     .limit(60)
 
-  const category = searchParams.get('category')
-  if (category && category !== 'all') {
-    query = query.contains('categories', [category])
+  const categories = (searchParams.get('categories') ?? '').split(',').filter(Boolean)
+  if (categories.length) {
+    query = query.overlaps('categories', categories)
   }
 
   if (searchParams.get('free') === 'true') {

@@ -92,7 +92,7 @@ export interface SimilarProfile extends Profile {
 export type DateFilter = 'all' | 'today' | 'this_week' | 'this_weekend' | 'this_month' | 'custom'
 
 export interface EventFilters {
-  category?: Category | 'all'
+  categories?: Category[]
   date?: DateFilter
   free?: boolean
   search?: string

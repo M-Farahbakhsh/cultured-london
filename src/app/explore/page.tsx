@@ -13,7 +13,7 @@ const PAGE_SIZE = 60
 
 interface PageProps {
   searchParams: Promise<{
-    category?: string
+    categories?: string
     date?: string
     free?: string
     search?: string
@@ -27,6 +27,15 @@ interface PageProps {
 }
 
 type ResolvedParams = Awaited<PageProps['searchParams']>
+
+function parseCategories(categories: string | undefined): string[] {
+  return (categories ?? '').split(',').filter(Boolean)
+}
+
+function filterByCategories(events: Event[], categories: string[]): Event[] {
+  if (!categories.length) return events
+  return events.filter(event => (event.categories ?? []).some(c => categories.includes(c)))
+}
 
 function buildUrl(params: Record<string, string | undefined>, overrides: Record<string, string | undefined>) {
   const merged = { ...params, ...overrides }
@@ -69,7 +78,7 @@ function buildRpcBase(params: ResolvedParams) {
   return {
     p_from_time: fromTime,
     p_to_time: toTime,
-    p_category: (params.category && params.category !== 'all') ? params.category : null,
+    p_category: null,
     p_is_free: params.free === 'true' ? true : null,
     p_search: params.search || null,
     p_strict_start: strictStart,
@@ -118,6 +127,8 @@ async function EventGrid({ searchParams }: PageProps) {
   const page = Math.max(1, parseInt(params.page ?? '1', 10))
   const hasTimeFilter = !!(params.time_from || params.time_to)
   const wantsPicked = params.picked === 'true'
+  const categories = parseCategories(params.categories)
+  const hasCategoryFilter = categories.length > 0
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -158,7 +169,7 @@ async function EventGrid({ searchParams }: PageProps) {
   let enriched: Event[]
   let count: number
 
-  if (hasTimeFilter || wantsPicked) {
+  if (hasTimeFilter || wantsPicked || hasCategoryFilter) {
     // JS-side filters need the full pool before paginating
     const { data } = await supabase.rpc('get_unique_events', {
       ...rpcBase,
@@ -167,6 +178,7 @@ async function EventGrid({ searchParams }: PageProps) {
     })
     let pool = score(displayAsOngoing((data ?? []) as Event[]))
     pool = filterByTimeOfDay(pool, params.time_from, params.time_to)
+    pool = filterByCategories(pool, categories)
     if (wantsPicked) pool = pool.filter(ev => (ev.match_score ?? 0) > 0)
     pool.sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0))
     count = pool.length
@@ -202,7 +214,7 @@ async function EventGrid({ searchParams }: PageProps) {
   }
 
   const urlParams = {
-    category: params.category,
+    categories: params.categories,
     date: params.date,
     free: params.free,
     search: params.search,
@@ -263,6 +275,7 @@ async function EventMapWrapper({ searchParams }: PageProps) {
   const supabase = await createClient()
   const rpcBase = buildRpcBase(params)
   const wantsPicked = params.picked === 'true'
+  const categories = parseCategories(params.categories)
 
   const { data: events } = await supabase.rpc('get_unique_events', {
     ...rpcBase,
@@ -272,6 +285,7 @@ async function EventMapWrapper({ searchParams }: PageProps) {
 
   const displayed = displayAsOngoing((events ?? []) as Event[])
   let filtered = filterByTimeOfDay(displayed, params.time_from, params.time_to)
+  filtered = filterByCategories(filtered, categories)
 
   if (wantsPicked) {
     const { data: { user } } = await supabase.auth.getUser()

@@ -32,7 +32,9 @@ export default function FilterBar() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const category = (searchParams.get('category') ?? 'all') as Category | 'all'
+  const categories = (searchParams.get('categories') ?? '')
+    .split(',')
+    .filter(Boolean) as Category[]
   const date = (searchParams.get('date') ?? 'all') as DateFilter
   const from = searchParams.get('from') ?? ''
   const timeFrom = searchParams.get('time_from') ?? ''
@@ -71,6 +73,17 @@ export default function FilterBar() {
 
   const handleDateTimeClear = () => {
     updateParams({ date: null, from: null, time_from: null, time_to: null })
+  }
+
+  const toggleCategory = (value: Category | 'all') => {
+    if (value === 'all') {
+      updateParams({ categories: null })
+      return
+    }
+    const next = categories.includes(value)
+      ? categories.filter(c => c !== value)
+      : [...categories, value]
+    updateParams({ categories: next.length ? next.join(',') : null })
   }
 
   return (
@@ -122,12 +135,12 @@ export default function FilterBar() {
           Picked for you
         </button>
         {CATEGORIES.map(({ value, label }) => {
-          const active = category === value
+          const active = value === 'all' ? categories.length === 0 : categories.includes(value as Category)
           const meta = value !== 'all' ? CATEGORY_META[value as Category] : null
           return (
             <button
               key={value}
-              onClick={() => updateParams({ category: value })}
+              onClick={() => toggleCategory(value)}
               className={`shrink-0 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors
                 ${active
                   ? (meta ? `${meta.bg} ${meta.color}` : 'bg-ink text-white')
